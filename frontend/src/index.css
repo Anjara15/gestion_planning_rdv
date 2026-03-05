@@ -1,0 +1,173 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Medical Design System - Heal-Cal */
+@layer base {
+  :root {
+    /* Medical Color Palette */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Medical Blue - Primary */
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 217 91% 55%;
+    --primary-light: 217 91% 95%;
+
+    /* Healthcare Green - Secondary */
+    --secondary: 158 64% 52%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 158 64% 47%;
+    --secondary-light: 158 64% 95%;
+
+    /* Medical Accent Colors */
+    --accent: 25 95% 53%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 25 95% 48%;
+    --accent-light: 25 95% 95%;
+
+    /* Neutral Medical Tones */
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --muted-dark: 220 14% 91%;
+
+    /* Status Colors */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 43 96% 56%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* UI Elements */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 60%;
+
+    /* Medical Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 70%));
+    --gradient-secondary: linear-gradient(135deg, hsl(158 64% 52%), hsl(158 64% 62%));
+    --gradient-hero: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(158 64% 52%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(220 14% 98%) 100%);
+
+    /* Medical Shadows */
+    --shadow-card: 0 4px 6px -1px hsl(220 13% 91% / 0.1), 0 2px 4px -1px hsl(220 13% 91% / 0.06);
+    --shadow-hover: 0 10px 15px -3px hsl(217 91% 60% / 0.1), 0 4px 6px -2px hsl(217 91% 60% / 0.05);
+    --shadow-focus: 0 0 0 3px hsl(217 91% 60% / 0.1);
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark Medical Theme */
+    --background: 222 47% 4%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 6%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 6%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Dark Medical Blue */
+    --primary: 217 91% 65%;
+    --primary-foreground: 222 47% 4%;
+    --primary-hover: 217 91% 60%;
+    --primary-light: 217 91% 10%;
+
+    /* Dark Healthcare Green */
+    --secondary: 158 64% 57%;
+    --secondary-foreground: 222 47% 4%;
+    --secondary-hover: 158 64% 52%;
+    --secondary-light: 158 64% 10%;
+
+    /* Dark Medical Accent */
+    --accent: 25 95% 58%;
+    --accent-foreground: 222 47% 4%;
+    --accent-hover: 25 95% 53%;
+    --accent-light: 25 95% 10%;
+
+    /* Dark Neutral Tones */
+    --muted: 220 14% 12%;
+    --muted-foreground: 220 9% 65%;
+    --muted-dark: 220 14% 8%;
+
+    /* Dark Status Colors */
+    --success: 142 76% 41%;
+    --success-foreground: 222 47% 4%;
+    --warning: 43 96% 61%;
+    --warning-foreground: 222 47% 4%;
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 222 47% 4%;
+
+    /* Dark UI Elements */
+    --border: 220 13% 15%;
+    --input: 220 13% 15%;
+    --ring: 217 91% 65%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 600;
+  }
+
+  /* Medical UI Utilities */
+  .medical-card {
+    @apply bg-card border border-border rounded-lg shadow-sm;
+  }
+
+  .medical-gradient {
+    background: var(--gradient-hero);
+  }
+
+  .medical-shadow {
+    box-shadow: var(--shadow-card);
+  }
+
+  .medical-shadow-hover {
+    box-shadow: var(--shadow-hover);
+  }
+}
