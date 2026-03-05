@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, Component } from "react";
 import { toast } from "sonner";
-import { Users2, CalendarCheck, X, Clock, User, Calendar, FileText, Settings, Plus, Edit, Trash2, Menu, X as XIcon, LogOut, BarChart3, Home, AlertTriangle } from "lucide-react";
+import { Users2, CalendarCheck, X, Clock, User, Calendar, FileText, Settings, Plus, Edit, Trash2, Menu, X as XIcon, LogOut, BarChart3, Home, AlertTriangle, MessageSquare } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import PropTypes from "prop-types";
 import EnhancedConsultationsPage from "./Historiques/ConsultationForm";
 import PatientMedicalFile from "./Historiques/PatientMedicalFile";
+import MessagingPanel from "@/components/MessagingPanel";
 import DatePicker from "react-datepicker";
 import fr from "date-fns/locale/fr";
 import "react-datepicker/dist/react-datepicker.css";
@@ -483,6 +484,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
             { view: "rdv", icon: CalendarCheck, label: `RDV du jour (${rdvDuJour.length})` },
             { view: "urgences", icon: AlertTriangle, label: `Urgences (${urgences.length})` },
             { view: "consultations", icon: FileText, label: "Consultations" },
+            { view: "messagerie", icon: MessageSquare, label: "Messagerie" },
             { view: "stats", icon: BarChart3, label: "Statistiques" },
           // eslint-disable-next-line no-unused-vars
           ].map(({ view, icon: Icon, label }) => (
@@ -1328,7 +1330,11 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
         </h3>
       </div>
       <div className="p-6">
-        <Messaging currentUser={currentUser} />
+        <MessagingPanel
+          currentUser={currentUser}
+          userRole="medecin"
+          addToHistory={addToHistory}
+        />
       </div>
     </div>
   );
@@ -1360,6 +1366,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
             {secondaryView === "planning" && renderPlanningPage()}
             {secondaryView === "creneauForm" && renderCreneauForm()}
             {secondaryView === "consultations" && renderConsultationsPage()}
+            {secondaryView === "messagerie" && renderMessageriePage()}
             {secondaryView === "profil" && renderProfilPage()}
             {secondaryView === "stats" && renderStatsPage()}
           </ErrorBoundary>

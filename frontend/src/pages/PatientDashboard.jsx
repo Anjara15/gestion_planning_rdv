@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState, useMemo } from "react";
-import {Calendar,  Heart,  Clock,  User,  List,  ArrowLeft,  Menu,  X as XIcon,  LogOut,  Settings,  CalendarCheck,  FileText,  Plus,  Trash2,  Search,  Home,  Star,  RefreshCw,  Loader2} from "lucide-react";
+import {Calendar,  Heart,  Clock,  User,  List,  ArrowLeft,  Menu,  X as XIcon,  LogOut,  Settings,  CalendarCheck,  FileText,  Plus,  Trash2,  Search,  Home,  Star,  RefreshCw,  Loader2,  MessageSquare} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { registerLocale } from "react-datepicker";
 import fr from "date-fns/locale/fr";
 import { useSpecialties } from "@/hooks/useSpecialties";
+import MessagingPanel from "@/components/MessagingPanel";
 
 registerLocale("fr", fr);
 
@@ -28,7 +29,7 @@ const _generalNotions = [
   { id: 3, text: "Annulez les RDV non nÃƒÂ©cessaires pour libÃƒÂ©rer des crÃƒÂ©neaux.", color: "text-orange-600" },
 ];
 
-const PatientDashboard = ({ logout }) => {
+const PatientDashboard = ({ currentUser, logout }) => {
   const [rendezVous, setRendezVous] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const didWelcomeRef = useRef(false);
@@ -562,6 +563,18 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
             <CalendarCheck className="w-5 h-5" />
             Mes RDV ({rendezVous.length})
           </Button>
+          <Button
+            variant={secondaryView === "messagerie" ? "default" : "ghost"}
+            className={`w-full justify-start gap-2 rounded-xl ${
+              secondaryView === "messagerie" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white" : "text-gray-700"
+            } hover:bg-gradient-to-r hover:from-cyan-600 hover:to-blue-700 hover:text-white transition-all duration-300`}
+            onClick={() => navigateTo("messagerie")}
+            aria-label="Ouvrir la messagerie"
+            aria-current={secondaryView === "messagerie" ? "page" : undefined}
+          >
+            <MessageSquare className="w-5 h-5" />
+            Messagerie
+          </Button>
         </nav>
       </div>
       {isSidebarOpen && (
@@ -894,6 +907,24 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+
+  const renderMessageriePage = () => (
+    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 mt-8 w-full">
+      <div className="p-6 border-b border-white/30">
+        <h3 className="text-xl font-semibold text-gray-700 text-center w-full flex items-center justify-center gap-2">
+          <MessageSquare className="w-5 h-5" />
+          Messagerie
+        </h3>
+      </div>
+      <div className="p-6">
+        <MessagingPanel
+          currentUser={currentUser}
+          userRole="patient"
+          addToHistory={addToHistory}
+        />
       </div>
     </div>
   );
@@ -1391,6 +1422,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
           {renderHeader()}
           {secondaryView === "accueil" && renderAccueilPage()}
           {secondaryView === "mesRdv" && renderMesRdvPage()}
+          {secondaryView === "messagerie" && renderMessageriePage()}
           {secondaryView === "profil" && renderProfilPage()}
           {secondaryView === "prendreRdv" && renderAccueilPage()}
           {isModalOpen && renderModal()}
