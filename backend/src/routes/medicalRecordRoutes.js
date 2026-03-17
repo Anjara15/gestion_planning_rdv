@@ -3,9 +3,10 @@ const router = express.Router();
 const { getMedicalRecords, createMedicalRecord, updateMedicalRecord, deleteMedicalRecord } = require('../controllers/medicalRecordController');
 const { authenticateToken, authorizeRole } = require('../middlewares/auth');
 
-router.get('/', authenticateToken, authorizeRole(['medecin']), getMedicalRecords);
-router.post('/', authenticateToken, authorizeRole(['medecin']), createMedicalRecord);
-router.put('/:id', authenticateToken, authorizeRole(['medecin']), updateMedicalRecord);
-router.delete('/:id', authenticateToken, authorizeRole(['medecin']), deleteMedicalRecord);
+// both doctors and patients should be able to call these endpoints; logic in controller
+router.get('/', authenticateToken, authorizeRole(['medecin', 'patient', 'admin', 'staff']), getMedicalRecords);
+router.post('/', authenticateToken, authorizeRole(['medecin', 'patient', 'admin', 'staff']), createMedicalRecord);
+router.put('/:id', authenticateToken, authorizeRole(['medecin', 'patient', 'admin', 'staff']), updateMedicalRecord);
+router.delete('/:id', authenticateToken, authorizeRole(['medecin', 'patient', 'admin', 'staff']), deleteMedicalRecord);
 
 module.exports = router;

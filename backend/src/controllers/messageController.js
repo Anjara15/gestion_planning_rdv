@@ -1,0 +1,47 @@
+const Message = require('../models/Message');
+
+// fetch conversation between two roles (medecin <-> patient)
+exports.getMessages = async (req, res) => {
+  try {
+    const { fromRole, toRole } = req.query;
+    if (!fromRole || !toRole) {
+      return res.status(400).json({ error: 'Paramètres fromRole et toRole requis' });
+    }
+
+    const msgs = await Message.findAll({
+      where: {
+        fromRole,
+        toRole,
+      },
+      order: [['createdAt', 'ASC']],
+    });
+    res.json(msgs);
+  } catch (err) {
+    console.error('❌ Error fetching messages:', err);
+    res.status(500).json({ error: 'Erreur serveur lors de la récupération des messages' });
+  }
+};
+
+exports.createMessage = async (req, res) => {
+  try {
+    const { fromId, fromName, fromRole, toRole, content } = req.body;
+    if (!fromId || !fromRole || !toRole || !content) {
+      return res.status(400).json({ error: 'Champs obligatoires manquants' });
+    }
+
+    const msg = await Message.create({
+      id: `msg_${Date.now()}`,
+      fromId,
+      fromName,
+      fromRole,
+      toRole,
+      content,
+      createdAt: new Date(),
+    });
+
+    res.status(201).json(msg);
+  } catch (err) {
+    console.error('❌ Error creating message:', err);
+    res.status(500).json({ error: 'Erreur serveur lors de la création du message' });
+  }
+};

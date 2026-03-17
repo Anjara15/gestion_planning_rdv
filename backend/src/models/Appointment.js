@@ -27,6 +27,15 @@ const Appointment = sequelize.define('Appointment', {
     type: DataTypes.STRING(255),
     allowNull: false,
   },
+  type_consultation: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    defaultValue: 'consultation',
+  },
+  severity: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+  },
   medecin_id: {
     type: DataTypes.INTEGER,
     allowNull: true,

@@ -8,176 +8,40 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const PrescriptionModal = ({ isOpen, onClose, patientName, consultationId, currentUser, addToHistory }) => {
-  const [medications, setMedications] = useState([{ name: "", dosage: "", frequency: "", duration: "" }]);
-  const [instructions, setInstructions] = useState("");
-  const [showSuccess, setShowSuccess] = useState(false);
+import axios from "axios";
 
-  const addMedication = () => {
-    setMedications([...medications, { name: "", dosage: "", frequency: "", duration: "" }]);
-  };
+const _apiBaseRaw = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const _apiBase = String(_apiBaseRaw).replace(/\/+$/, "");
+const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
-  const removeMedication = (index) => {
-    setMedications(medications.filter((_, i) => i !== index));
-  };
-
-  const updateMedication = (index, field, value) => {
-    const updated = [...medications];
-    updated[index] = { ...updated[index], [field]: value };
-    setMedications(updated);
-  };
-
-  const generatePrescription = () => {
-    const validMedications = medications.filter((med) => med.name.trim() !== "");
-    if (validMedications.length === 0 && !instructions.trim()) {
-      toast.error("Veuillez ajouter au moins un médicament ou des instructions.");
-      return;
-    }
-
-    const prescription = {
-      id: Date.now().toString(),
-      consultationId,
-      patientName,
-      doctor: currentUser?.username || "Dr. Martin",
-      date: new Date().toISOString().split("T")[0],
-      medications: validMedications,
-      instructions,
-      createdAt: new Date().toISOString(),
-    };
-
-    addToHistory?.("Génération ordonnance", `Ordonnance générée pour ${patientName}`, currentUser);
-
-    setShowSuccess(true);
-    toast.success("Ordonnance générée", { description: `${patientName} • ${new Date().toLocaleDateString('fr-FR')}` });
-    setTimeout(() => {
-      setShowSuccess(false);
-      onClose();
-    }, 2000);
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
-        <Button variant="ghost" onClick={onClose} className="rounded-xl absolute top-4 right-4">
-          <X className="w-5 h-5" />
-        </Button>
-
-        <div className="p-6 space-y-6">
-          <div className="flex items-start justify-between border-b border-border pb-4">
-            <div>
-              <h2 className="text-2xl font-bold text-primary">Génération d'Ordonnance</h2>
-              <p className="text-muted-foreground">Patient : {patientName}</p>
-            </div>
-          </div>
-          {showSuccess && (
-            <Alert className="border-green-300 bg-green-50">
-              <AlertDescription className="text-green-700">
-                Ordonnance générée avec succès !
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div>
-            <Label className="text-lg font-semibold">Médicaments prescrits</Label>
-            <div className="space-y-4 mt-3">
-              {medications.map((med, index) => (
-                <div key={index} className="border border-border rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium">Médicament {index + 1}</h4>
-                    {medications.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeMedication(index)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Nom du médicament</Label>
-                      <Input
-                        value={med.name}
-                        onChange={(e) => updateMedication(index, "name", e.target.value)}
-                        placeholder="Ex: Paracétamol"
-                        className="rounded-xl"
-                      />
-                    </div>
-                    <div>
-                      <Label>Dosage</Label>
-                      <Input
-                        value={med.dosage}
-                        onChange={(e) => updateMedication(index, "dosage", e.target.value)}
-                        placeholder="Ex: 500mg"
-                        className="rounded-xl"
-                      />
-                    </div>
-                    <div>
-                      <Label>Fréquence</Label>
-                      <Input
-                        value={med.frequency}
-                        onChange={(e) => updateMedication(index, "frequency", e.target.value)}
-                        placeholder="Ex: 3 fois par jour"
-                        className="rounded-xl"
-                      />
-                    </div>
-                    <div>
-                      <Label>Durée</Label>
-                      <Input
-                        value={med.duration}
-                        onChange={(e) => updateMedication(index, "duration", e.target.value)}
-                        placeholder="Ex: 7 jours"
-                        className="rounded-xl"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <Button
-                variant="outline"
-                onClick={addMedication}
-                className="w-full rounded-xl border-dashed"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Ajouter un médicament
-              </Button>
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-lg font-semibold">Instructions spéciales</Label>
-            <Textarea
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              placeholder="Instructions particulières pour le patient..."
-              rows={4}
-              className="rounded-xl mt-3"
-            />
-          </div>
-
-          <div className="flex justify-end gap-4 pt-4">
-            <Button variant="outline" onClick={onClose} className="rounded-xl">
-              Annuler
-            </Button>
-            <Button
-              onClick={generatePrescription}
-              disabled={medications.every((med) => med.name.trim() === "") && !instructions.trim()}
-              className="bg-green-600 hover:bg-green-700 text-white rounded-xl"
-            >
-              Générer l'ordonnance
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+const getTokenHeader = () => {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-const ConsultationCard = ({ consultation, onGeneratePrescription }) => {
+async function fetchConsultationsFromApi(patientId) {
+  const params = {};
+  if (patientId) params.patient_id = patientId;
+  const resp = await axios.get(`${API_BASE_URL}/consultations`, { params, headers: getTokenHeader() });
+  return resp.data;
+}
+
+async function createConsultationApi(body) {
+  const resp = await axios.post(`${API_BASE_URL}/consultations`, body, { headers: { "Content-Type": "application/json", ...getTokenHeader() } });
+  return resp.data;
+}
+
+async function updateConsultationApi(id, body) {
+  const resp = await axios.put(`${API_BASE_URL}/consultations/${id}`, body, { headers: { "Content-Type": "application/json", ...getTokenHeader() } });
+  return resp.data;
+}
+
+async function deleteConsultationApi(id) {
+  const resp = await axios.delete(`${API_BASE_URL}/consultations/${id}`, { headers: getTokenHeader() });
+  return resp.data;
+}
+
+const ConsultationCard = ({ consultation }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
   const formatDate = (dateStr) => {
@@ -226,14 +90,36 @@ const ConsultationCard = ({ consultation, onGeneratePrescription }) => {
         </div>
         
         <div className="flex items-center gap-2">
+          {/* edit/delete actions could be wired up by parent via context or callbacks; placeholder icons for now */}
           <Button
             size="sm"
-            variant="outline"
-            onClick={() => onGeneratePrescription(consultation.id, consultation.patientName)}
-            className="rounded-xl text-green-600 border-green-200 hover:bg-green-50"
+            variant="ghost"
+            className="text-indigo-600"
+            onClick={() => {
+              // event will bubble; parent component does not currently have handler; we will use a custom event to signal
+              const evt = new CustomEvent('editConsultation', { detail: consultation });
+              window.dispatchEvent(evt);
+            }}
           >
-            <Pill className="w-4 h-4 mr-1" />
-            Ordonnance
+            <Edit className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-red-600"
+            onClick={async () => {
+              if (!window.confirm('Supprimer cette consultation ?')) return;
+              try {
+                await deleteConsultationApi(consultation.id);
+                const evt = new CustomEvent('deletedConsultation', { detail: consultation.id });
+                window.dispatchEvent(evt);
+              } catch (err) {
+                console.error(err);
+                toast.error('Erreur suppression');
+              }
+            }}
+          >
+            <Trash2 className="w-4 h-4" />
           </Button>
           <Button
             size="sm"
@@ -367,15 +253,11 @@ const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients }) => {
   const [consultations, setConsultations] = useState([]);
   const [filteredConsultations, setFilteredConsultations] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingConsultation, setEditingConsultation] = useState(null);
   const [currentSymptom, setCurrentSymptom] = useState("");
   const [currentRecommendation, setCurrentRecommendation] = useState("");
-  const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
-  const [selectedConsultationForPrescription, setSelectedConsultationForPrescription] = useState("");
-  const [selectedPatientForPrescription, setSelectedPatientForPrescription] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [showGeneratePrescriptionButton, setShowGeneratePrescriptionButton] = useState(false);
-  const [lastSavedConsultationId, setLastSavedConsultationId] = useState("");
   
   // Filtres et recherche
   const [searchTerm, setSearchTerm] = useState("");
@@ -396,62 +278,46 @@ const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients }) => {
     medications: [],
   });
 
-  const loadConsultations = useCallback(() => {
-    // Simulation de données pour la démo
-    const mockConsultations = [
-      {
-        id: "1",
-        patientName: "Marie Dupont",
-        date: "2025-01-15",
-        time: "14:30",
-        symptoms: ["Fièvre", "Maux de tête", "Fatigue"],
-        examination: "Température 38.5°C, tension artérielle normale, examen physique révèle une légère inflammation de la gorge.",
-        diagnosis: "Syndrome grippal",
-        treatment: "Repos, hydratation, paracétamol en cas de fièvre",
-        recommendations: ["Repos complet 48h", "Hydratation importante", "Consulter si aggravation"],
-        followUp: "Revoir dans 5 jours si pas d'amélioration",
-        doctor: currentUser?.username || "Dr. Martin",
-        medications: [
-          { name: "Paracétamol", dosage: "500mg", frequency: "3 fois/jour", duration: "7 jours" }
-        ]
-      },
-      {
-        id: "2",
-        patientName: "Jean Martin",
-        date: "2025-01-14",
-        time: "10:15",
-        symptoms: ["Douleur abdominale", "Nausées"],
-        examination: "Abdomen souple, douleur épigastrique à la palpation, pas de défense.",
-        diagnosis: "Gastrite probable",
-        treatment: "Inhibiteur de pompe à protons, régime alimentaire",
-        recommendations: ["Éviter les épices", "Repas fractionnés", "Arrêt tabac/alcool"],
-        followUp: "Contrôle dans 2 semaines",
-        doctor: currentUser?.username || "Dr. Martin",
-        medications: [
-          { name: "Oméprazole", dosage: "20mg", frequency: "1 fois/jour", duration: "15 jours" }
-        ]
-      },
-      {
-        id: "3",
-        patientName: "Sophie Laurent",
-        date: "2025-01-13",
-        time: "16:45",
-        symptoms: ["Toux persistante", "Essoufflement"],
-        examination: "Auscultation pulmonaire : râles sibilants bilatéraux, SpO2 96%.",
-        diagnosis: "Exacerbation asthmatique légère",
-        treatment: "Bronchodilatateurs, corticoïdes inhalés",
-        recommendations: ["Éviter les allergènes", "Peak flow quotidien", "Plan d'action asthme"],
-        followUp: "Suivi dans 1 semaine",
-        doctor: currentUser?.username || "Dr. Martin",
-        medications: [
-          { name: "Salbutamol", dosage: "100μg", frequency: "2 bouffées 4 fois/jour", duration: "10 jours" },
-          { name: "Beclometasone", dosage: "250μg", frequency: "2 bouffées 2 fois/jour", duration: "1 mois" }
-        ]
-      }
-    ];
-    
-    setConsultations(mockConsultations);
+  const loadConsultations = useCallback(async () => {
+    try {
+      const data = await fetchConsultationsFromApi();
+      setConsultations(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Erreur chargement consultations:", err);
+    }
   }, [currentUser]);
+
+  // listen for edit/delete events from ConsultationCard
+  useEffect(() => {
+    const onEdit = (e) => {
+      const item = e.detail;
+      setEditingConsultation(item);
+      setFormData({
+        patientId: item.patient_id || item.patientId || item.patient?.id || "",
+        patientName: item.patient?.username || item.patientName || "",
+        date: item.date || "",
+        time: item.time || "",
+        symptoms: item.symptoms || [],
+        examination: item.examination || "",
+        diagnosis: item.diagnosis || "",
+        treatment: item.treatment || "",
+        recommendations: item.recommendations || [],
+        followUp: item.follow_up || item.followUp || "",
+        medications: item.medications || [],
+      });
+      setShowForm(true);
+    };
+    const onDeleted = (e) => {
+      const id = e.detail;
+      setConsultations((prev) => prev.filter((c) => c.id !== id));
+    };
+    window.addEventListener('editConsultation', onEdit);
+    window.addEventListener('deletedConsultation', onDeleted);
+    return () => {
+      window.removeEventListener('editConsultation', onEdit);
+      window.removeEventListener('deletedConsultation', onDeleted);
+    };
+  }, []);
 
   useEffect(() => {
     loadConsultations();
@@ -487,16 +353,14 @@ const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients }) => {
     setFilteredConsultations(filtered);
   }, [consultations, searchTerm, dateFilter, sortOrder]);
 
-  const handleFormSubmit = () => {
+  const handleFormSubmit = async () => {
     if (!formData.patientId || !formData.examination || !formData.diagnosis) {
       toast.error("Champs requis manquants", { description: "Patient, examen et diagnostic sont obligatoires." });
       return;
     }
 
-    const newConsultation = {
-      id: Date.now().toString(),
-      patientId: formData.patientId,
-      patientName: formData.patientName || "",
+    const body = {
+      patient_id: formData.patientId,
       date: formData.date || "",
       time: formData.time || "",
       symptoms: formData.symptoms || [],
@@ -504,31 +368,41 @@ const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients }) => {
       diagnosis: formData.diagnosis || "",
       treatment: formData.treatment || "",
       recommendations: formData.recommendations || [],
-      followUp: formData.followUp || "",
-      doctor: currentUser?.username || "Dr. Martin",
+      follow_up: formData.followUp || "",
       medications: formData.medications || [],
     };
 
-    setConsultations([...consultations, newConsultation]);
-    setSuccessMessage("Note de consultation enregistrée avec succès !");
-    setShowSuccess(true);
-    toast.success("Consultation enregistrée", { description: `${newConsultation.patientName} — ${newConsultation.date} à ${newConsultation.time}` });
-    setShowGeneratePrescriptionButton(true);
-    setLastSavedConsultationId(newConsultation.id);
-    setSelectedPatientForPrescription(newConsultation.patientName);
+    try {
+      let saved;
+      if (editingConsultation) {
+        saved = await updateConsultationApi(editingConsultation.id, body);
+        setConsultations((prev) => prev.map((c) => (c.id === saved.id ? saved : c)));
+      } else {
+        saved = await createConsultationApi(body);
+        setConsultations([...consultations, saved]);
+      }
 
-    addToHistory?.("Nouvelle consultation", `Consultation enregistrée pour ${newConsultation.patientName}`, currentUser);
+      setSuccessMessage("Note de consultation enregistrée avec succès !");
+      setShowSuccess(true);
+      toast.success("Consultation enregistrée", { description: `${saved.patientName} — ${saved.date} à ${saved.time}` });
 
-    setTimeout(() => {
-      setShowSuccess(false);
-    }, 2000);
+      addToHistory?.(
+        editingConsultation ? "Consultation modifiée" : "Nouvelle consultation",
+        `${editingConsultation ? 'Mise à jour' : 'Consultation enregistrée'} pour ${saved.patientName}`,
+        currentUser
+      );
 
-    resetForm();
-  };
+      setTimeout(() => {
+        setShowSuccess(false);
+        setEditingConsultation(null);
+      }, 2000);
 
-  const handleGeneratePrescriptionClick = () => {
-    setSelectedConsultationForPrescription(lastSavedConsultationId);
-    setShowPrescriptionModal(true);
+      resetForm();
+      setEditingConsultation(null);
+    } catch (err) {
+      console.error(err);
+      toast.error(`Erreur API: ${err.message}`);
+    }
   };
 
   const resetForm = () => {
@@ -768,14 +642,6 @@ const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients }) => {
               <Save className="w-4 h-4 mr-2" />
               Enregistrer
             </Button>
-            {showGeneratePrescriptionButton && (
-              <Button
-                onClick={handleGeneratePrescriptionClick}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-xl"
-              >
-                Générer l'ordonnance
-              </Button>
-            )}
           </div>
         </div>
       )}
@@ -836,30 +702,15 @@ const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients }) => {
               <ConsultationCard
                 key={consultation.id}
                 consultation={consultation}
-                onGeneratePrescription={(consultationId, patientName) => {
-                  setSelectedConsultationForPrescription(consultationId);
-                  setSelectedPatientForPrescription(patientName);
-                  setShowPrescriptionModal(true);
-                }}
               />
             ))}
           </div>
         )}
       </div>
-
-      <PrescriptionModal
-        isOpen={showPrescriptionModal}
-        onClose={() => {
-          setShowPrescriptionModal(false);
-          setShowGeneratePrescriptionButton(false);
-        }}
-        patientName={selectedPatientForPrescription}
-        consultationId={selectedConsultationForPrescription}
-        currentUser={currentUser}
-        addToHistory={addToHistory}
-      />
     </div>
   );
 };
 
 export default EnhancedConsultationsPage;
+
+

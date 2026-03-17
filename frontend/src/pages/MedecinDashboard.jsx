@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, Component } from "react";
 import { toast } from "sonner";
-import { Users2, CalendarCheck, X, Clock, User, Calendar, FileText, Settings, Plus, Edit, Trash2, Menu, X as XIcon, LogOut, BarChart3, Home, AlertTriangle, MessageSquare } from "lucide-react";
+import { Users2, CalendarCheck, X, Clock, User, Calendar, FileText, Settings, Plus, Edit, Trash2, Menu, X as XIcon, LogOut, BarChart3, Home, AlertTriangle, MessageSquare, FilePlus2, CreditCard, History, Pill } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import PropTypes from "prop-types";
 import EnhancedConsultationsPage from "./Historiques/ConsultationForm";
+import OrdonnancesPage from "./Historiques/OrdonnancesPage";
 import PatientMedicalFile from "./Historiques/PatientMedicalFile";
 import MessagingPanel from "@/components/MessagingPanel";
+import MedecinPaymentsPage from "./MedecinPaymentsPage";
+import MedecinActivityHistory from "./section/MedecinActivityHistory";
+import MedecinMedicamentsPage from "./MedecinMedicamentsPage";
 import DatePicker from "react-datepicker";
 import fr from "date-fns/locale/fr";
 import "react-datepicker/dist/react-datepicker.css";
@@ -48,7 +52,9 @@ ErrorBoundary.propTypes = {
 };
 
 // For Vite projects, use import.meta.env
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+const _apiBaseRaw = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const _apiBase = String(_apiBaseRaw).replace(/\/+$/, "");
+const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
 const Modal = ({ isOpen, onClose, children }) => {
   if (!isOpen) return null;
@@ -105,6 +111,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [stats, setStats] = useState(null);
+  const [lastStatsRefresh, setLastStatsRefresh] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem("token"));
   const navigate = useNavigate();
 
@@ -461,6 +468,25 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
     }
   };
 
+  const navItems = useMemo(
+    () =>
+      [
+        { view: "accueil", icon: Home, label: "Accueil" },
+        { view: "activites", icon: History, label: "Historique d'activites" },
+        { view: "consultations", icon: FileText, label: "Consultations" },
+        { view: "medicaments", icon: Pill, label: "Medicaments" },
+        { view: "messagerie", icon: MessageSquare, label: "Messagerie" },
+        { view: "ordonnances", icon: FilePlus2, label: "Ordonnances" },
+        { view: "paiements", icon: CreditCard, label: "Paiements" },
+        { view: "patients", icon: Users2, label: "Patients" },
+        { view: "planning", icon: Calendar, label: "Planning" },
+        { view: "rdv", icon: CalendarCheck, label: "RDV du jour" },
+        { view: "stats", icon: BarChart3, label: "Statistiques" },
+        { view: "urgences", icon: AlertTriangle, label: "Urgences" },
+      ].sort((a, b) => a.label.localeCompare(b.label, "fr", { sensitivity: "base" })),
+    []
+  );
+
   const renderSidebar = () => (
     <>
       <button
@@ -477,17 +503,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
           <p className="text-sm text-gray-500">Dr. {medecin?.username || "MÃ©decin"}</p>
         </div>
         <nav className="flex-1 p-4 space-y-2">
-          {[
-            { view: "accueil", icon: Home, label: "Accueil" },
-            { view: "patients", icon: Users2, label: `Mes patients (${patients.length})` },
-            { view: "planning", icon: Calendar, label: "Mon planning" },
-            { view: "rdv", icon: CalendarCheck, label: `RDV du jour (${rdvDuJour.length})` },
-            { view: "urgences", icon: AlertTriangle, label: `Urgences (${urgences.length})` },
-            { view: "consultations", icon: FileText, label: "Consultations" },
-            { view: "messagerie", icon: MessageSquare, label: "Messagerie" },
-            { view: "stats", icon: BarChart3, label: "Statistiques" },
-          // eslint-disable-next-line no-unused-vars
-          ].map(({ view, icon: Icon, label }) => (
+          {navItems.map(({ view, icon: Icon, label }) => (
             <Button
               key={view}
               variant={secondaryView === view || (view === "planning" && secondaryView === "creneauForm") ? "default" : "ghost"}
@@ -1080,6 +1096,54 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
     </div>
   );
 
+  const renderMedicamentsPage = () => (
+    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 w-full">
+      <div className="p-4 sm:p-6">
+        <ErrorBoundary>
+          <MedecinMedicamentsPage />
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+
+  const renderOrdonnancesPage = () => (
+    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 w-full">
+      <div className="p-4 sm:p-6">
+        <ErrorBoundary>
+          <OrdonnancesPage
+            currentUser={currentUser}
+            addToHistory={addToHistory}
+            patients={patients}
+          />
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+
+  const renderPaiementsPage = () => (
+    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 w-full">
+      <div className="p-4 sm:p-6">
+        <ErrorBoundary>
+          <MedecinPaymentsPage
+            currentUser={currentUser}
+            addToHistory={addToHistory}
+            patients={patients}
+          />
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+
+  const renderActivitesPage = () => (
+    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 w-full">
+      <div className="p-4 sm:p-6">
+        <ErrorBoundary>
+          <MedecinActivityHistory currentUser={currentUser} />
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+
   const renderProfilPage = () => (
     <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 mt-8 w-full">
       <div className="p-4 sm:p-6 border-b border-white/30">
@@ -1177,66 +1241,91 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
     </div>
   );
 
-  const fetchStats = useCallback(async () => {
-    if (!isAuthenticated) return;
+  const fetchStats = useCallback(
+    async (options = {}) => {
+      if (!isAuthenticated) return;
 
-    try {
-      console.log("[fetchStats] Fetching statistics...");
-      const response = await axiosInstance.get("/stats");
-      setStats(response.data);
-    } catch (err) {
-      console.error("[fetchStats] Error fetching stats:", err);
-      toast.error("Erreur lors de la rÃ©cupÃ©ration des statistiques.");
-      setStats({
-        totalPatients: patients.length,
-        totalAppointments: rdvDuJour.length + urgences.length,
-        totalCreneaux: creneaux.length,
-      });
-    }
-  }, [isAuthenticated, axiosInstance, patients.length, rdvDuJour.length, urgences.length, creneaux.length]);
+      const { silent = false } = options;
+
+      try {
+        console.log("[fetchStats] Fetching statistics...");
+        const response = await axiosInstance.get("/stats");
+        setStats(response.data);
+        setLastStatsRefresh(new Date().toISOString());
+      } catch (err) {
+        console.error("[fetchStats] Error fetching stats:", err);
+        if (!silent) {
+          toast.error("Erreur lors de la recuperation des statistiques.");
+        }
+      }
+    },
+    [isAuthenticated, axiosInstance]
+  );
 
   useEffect(() => {
-    let isMounted = true;
+    if (!isAuthenticated || secondaryView !== "stats") return;
 
-    if (secondaryView === "stats" && !stats && isAuthenticated && isMounted) {
-      console.log("[useEffect] Fetching stats...");
-      fetchStats();
+    fetchStats();
+    const intervalId = setInterval(() => {
+      fetchStats({ silent: true });
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [secondaryView, isAuthenticated, fetchStats]);
+
+  const formatMonthLabel = (monthValue) => {
+    const date = new Date(monthValue);
+    if (Number.isNaN(date.getTime())) {
+      return String(monthValue || "-");
     }
 
-    return () => {
-      isMounted = false;
-    };
-  }, [secondaryView, stats, isAuthenticated, fetchStats]);
+    return date.toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
+  };
 
   const renderStatsPage = () => {
-    const chartData = stats
-      ? [
-          { name: "Patients", value: stats.totalPatients || 0, fill: "#3b82f6" },
-          { name: "RDV du jour", value: stats.totalAppointments || 0, fill: "#10b981" },
-          { name: "Urgences", value: urgences.length, fill: "#ef4444" },
-          { name: "CrÃ©neaux", value: stats.totalCreneaux || 0, fill: "#8b5cf6" },
-        ]
-      : [];
+    const appointmentsByMonth = Array.isArray(stats?.appointmentsByMonth) ? stats.appointmentsByMonth : [];
+    const consultationsByMonth = Array.isArray(stats?.consultationsByMonth) ? stats.consultationsByMonth : [];
+    const appointmentsBySpecialty = Array.isArray(stats?.appointmentsBySpecialty) ? stats.appointmentsBySpecialty : [];
 
-    const lineData = [
-      { month: "Jan", patients: 45, rdv: 120, urgences: 5 },
-      { month: "FÃ©v", patients: 52, rdv: 135, urgences: 7 },
-      { month: "Mar", patients: 48, rdv: 128, urgences: 4 },
-      { month: "Avr", patients: 61, rdv: 145, urgences: 8 },
-      { month: "Mai", patients: 55, rdv: 138, urgences: 6 },
-      { month: "Jun", patients: 67, rdv: 152, urgences: 9 },
+    const totalConsultations = consultationsByMonth.reduce((acc, item) => acc + Number(item.count || 0), 0);
+
+    const chartData = [
+      { name: "Patients", value: Number(stats?.totalPatients || 0), fill: "#3b82f6" },
+      { name: "RDV", value: Number(stats?.totalAppointments || 0), fill: "#10b981" },
+      { name: "Consultations", value: totalConsultations, fill: "#f97316" },
+      { name: "Specialites", value: appointmentsBySpecialty.length, fill: "#8b5cf6" },
     ];
 
-    const statusCounts = urgences.reduce((acc, urgence) => {
-      const status = urgence.statusInfo?.status || "Inconnu";
-      acc[status] = (acc[status] || 0) + 1;
-      return acc;
-    }, {});
+    const monthMap = new Map();
+    appointmentsByMonth.forEach((item) => {
+      const key = String(item.month);
+      monthMap.set(key, {
+        month: key,
+        rdv: Number(item.count || 0),
+        consultations: monthMap.get(key)?.consultations || 0,
+      });
+    });
 
-    const pieData = Object.entries(statusCounts).map(([status, count], index) => ({
-      name: status,
-      value: count,
-      fill: ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"][index % 4],
+    consultationsByMonth.forEach((item) => {
+      const key = String(item.month);
+      monthMap.set(key, {
+        month: key,
+        rdv: monthMap.get(key)?.rdv || 0,
+        consultations: Number(item.count || 0),
+      });
+    });
+
+    const lineData = [...monthMap.values()]
+      .sort((a, b) => new Date(a.month) - new Date(b.month))
+      .map((item) => ({
+        ...item,
+        monthLabel: formatMonthLabel(item.month),
+      }));
+
+    const pieData = appointmentsBySpecialty.map((item, index) => ({
+      name: item.specialty || "Non specifiee",
+      value: Number(item.count || 0),
+      fill: ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#9C27B0"][index % 5],
     }));
 
     return (
@@ -1250,6 +1339,9 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
         <div className="p-4 sm:p-6">
           {stats ? (
             <div className="space-y-8">
+              <p className="text-sm text-center text-gray-500">
+                Derniere synchronisation: {lastStatsRefresh ? new Date(lastStatsRefresh).toLocaleTimeString("fr-FR") : "--:--:--"}
+              </p>
               <div className="w-full">
                 <h4 className="text-base font-medium text-gray-700 mb-4 text-center">Vue d'ensemble</h4>
                 <div className="w-full h-64 flex justify-center">
@@ -1278,18 +1370,17 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
                     margin={{ top: 20, right: 20, left: 10, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" fontSize={12} />
+                    <XAxis dataKey="monthLabel" fontSize={12} />
                     <YAxis fontSize={12} />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="patients" stroke="#8884d8" strokeWidth={2} />
-                    <Line type="monotone" dataKey="rdv" stroke="#82ca9d" strokeWidth={2} />
-                    <Line type="monotone" dataKey="urgences" stroke="#ef4444" strokeWidth={2} />
+                    <Line type="monotone" dataKey="rdv" stroke="#82ca9d" strokeWidth={2} name="Rendez-vous" />
+                    <Line type="monotone" dataKey="consultations" stroke="#8884d8" strokeWidth={2} name="Consultations" />
                   </LineChart>
                 </div>
               </div>
               <div className="w-full">
-                <h4 className="text-base font-medium text-gray-700 mb-4 text-center">RÃ©partition des urgences par statut</h4>
+                <h4 className="text-base font-medium text-gray-700 mb-4 text-center">Repartition des rendez-vous par specialite</h4>
                 <div className="w-full h-64 flex justify-center">
                   <PieChart width={Math.min(window.innerWidth * 0.9, 400)} height={250}>
                     <Pie
@@ -1366,6 +1457,10 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
             {secondaryView === "planning" && renderPlanningPage()}
             {secondaryView === "creneauForm" && renderCreneauForm()}
             {secondaryView === "consultations" && renderConsultationsPage()}
+            {secondaryView === "medicaments" && renderMedicamentsPage()}
+            {secondaryView === "ordonnances" && renderOrdonnancesPage()}
+            {secondaryView === "paiements" && renderPaiementsPage()}
+            {secondaryView === "activites" && renderActivitesPage()}
             {secondaryView === "messagerie" && renderMessageriePage()}
             {secondaryView === "profil" && renderProfilPage()}
             {secondaryView === "stats" && renderStatsPage()}
@@ -1405,8 +1500,4 @@ MedecinDashboard.propTypes = {
 };
 
 export default MedecinDashboard;
-
-
-
-
 

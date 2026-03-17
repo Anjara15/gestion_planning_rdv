@@ -3,6 +3,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUserPlus, faEye, faEyeSlash, faUser, faLock, faEnvelope, faArrowLeft, faStethoscope, faUserMd } from '@fortawesome/free-solid-svg-icons';
 import { useNavigate } from 'react-router-dom';
 
+const _apiBaseRaw = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const _apiBase = String(_apiBaseRaw).replace(/\/+$/, "");
+const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
+
 const Auth = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -18,7 +22,7 @@ const Auth = () => {
     setIsLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost:3000/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -220,7 +224,7 @@ const Register = ({ setShowRegister }) => {
     console.log('🔍 Frontend - Specialty being sent:', registrationData.specialite);
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(registrationData),

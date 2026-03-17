@@ -1,18 +1,63 @@
 ﻿import { useEffect, useRef, useState, useMemo } from "react";
-import {Calendar,  Heart,  Clock,  User,  List,  ArrowLeft,  Menu,  X as XIcon,  LogOut,  Settings,  CalendarCheck,  FileText,  Plus,  Trash2,  Search,  Home,  Star,  RefreshCw,  Loader2,  MessageSquare} from "lucide-react";
+import {
+  Calendar,
+  Heart,
+  Clock,
+  User,
+  List,
+  ArrowLeft,
+  Menu,
+  X as XIcon,
+  LogOut,
+  Settings,
+  CalendarCheck,
+  FileText,
+  Plus,
+  Trash2,
+  Search,
+  Home,
+  Star,
+  RefreshCw,
+  Loader2,
+  MessageSquare,
+  Video,
+  BarChart3,
+  Activity,
+  Wallet,
+  FolderOpen,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import axios from "axios";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { registerLocale } from "react-datepicker";
 import fr from "date-fns/locale/fr";
 import { useSpecialties } from "@/hooks/useSpecialties";
 import MessagingPanel from "@/components/MessagingPanel";
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from "recharts";
 
 registerLocale("fr", fr);
+
+const PRESCRIPTIONS_STORAGE_KEY = "medecinPrescriptions";
+const PAYMENTS_STORAGE_KEY = "medecinPayments";
+const PATIENT_ACTIVITY_STORAGE_KEY = "patientActivities";
+const PATIENT_SPORTS_ACTIVITY_STORAGE_KEY = "patientSportsActivities";
 
 // Health tips data
 const healthTips = [
@@ -51,10 +96,16 @@ const PatientDashboard = ({ currentUser, logout }) => {
   });
   const [editProfile, setEditProfile] = useState(null);
   const [secondaryView, setSecondaryView] = useState("accueil");
+  const [activeDocumentCard, setActiveDocumentCard] = useState("ordonnances");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [specialtySearch, setSpecialtySearch] = useState("");
   const [isSpecialtyDropdownOpen, setIsSpecialtyDropdownOpen] = useState(false);
   const [errors, setErrors] = useState({});
+  // patient document/payment form state
+  const [docForm, setDocForm] = useState({ title: "", description: "", date: "" });
+  const [editingDocId, setEditingDocId] = useState(null);
+  const [paymentForm, setPaymentForm] = useState({ amount: "", reference: "", method: "", status: "en_attente", date: "" });
+  const [editingPaymentId, setEditingPaymentId] = useState(null);
   const [availableSlots, setAvailableSlots] = useState([]);
   const sidebarRef = useRef(null);
 
@@ -62,6 +113,17 @@ const PatientDashboard = ({ currentUser, logout }) => {
   const [favoriteSpecialties, setFavoriteSpecialties] = useState([]);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [searchTimeout, setSearchTimeout] = useState(null);
+  const [_historyVersion, setHistoryVersion] = useState(0);
+  const [sportsVersion, setSportsVersion] = useState(0);
+  const [documentsVersion, setDocumentsVersion] = useState(0);
+  const [lastPatientStatsRefresh, setLastPatientStatsRefresh] = useState(null);
+  const [sportActivityForm, setSportActivityForm] = useState({
+    sport: "",
+    duration: "",
+    intensity: "moderee",
+    date: new Date().toISOString().split("T")[0],
+    note: "",
+  });
 
   // Load favorite specialties from localStorage on mount
   useEffect(() => {
@@ -121,8 +183,161 @@ const PatientDashboard = ({ currentUser, logout }) => {
 
   // API base URL
   const _apiBaseRaw = import.meta.env.VITE_API_URL || "http://localhost:3000";
-const _apiBase = _apiBaseRaw.replace(/\/+$/, "");
-const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
+  const _apiBase = _apiBaseRaw.replace(/\/+$/, "");
+  const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
+
+  const readStorageArray = (key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.error(`Error parsing storage key ${key}:`, error);
+      return [];
+    }
+  };
+
+  const normalizeText = (value) => String(value || "").trim().toLowerCase();
+
+  const patientIdentity = useMemo(() => {
+    const firstName = normalizeText(profile?.nom);
+    const lastName = normalizeText(profile?.prenom);
+    const fullName = normalizeText(`${profile?.nom || ""} ${profile?.prenom || ""}`);
+    const username = normalizeText(currentUser?.username);
+    const email = normalizeText(profile?.email || currentUser?.email);
+    const id = String(currentUser?.id || "").trim();
+
+    return {
+      id,
+      email,
+      names: [fullName, username, firstName, lastName].filter(Boolean),
+      fullName,
+    };
+  }, [currentUser?.id, currentUser?.username, currentUser?.email, profile?.nom, profile?.prenom, profile?.email]);
+
+  const matchesCurrentPatient = (entry) => {
+    if (!entry || typeof entry !== "object") return false;
+
+    const patientId = String(entry.patientId || entry.patient_id || entry.patient?.id || "").trim();
+    const patientName = normalizeText(entry.patientName || entry.patient_name || entry.patient?.username);
+    const patientEmail = normalizeText(entry.patientEmail || entry.email || entry.patient?.email);
+
+    if (patientIdentity.id && patientId && patientIdentity.id === patientId) return true;
+    if (patientIdentity.email && patientEmail && patientIdentity.email === patientEmail) return true;
+    if (patientName && patientIdentity.names.some((name) => name && (patientName.includes(name) || name.includes(patientName)))) return true;
+    return false;
+  };
+
+  const sortByRecentDate = (items) =>
+    [...items].sort((a, b) => {
+      const aDate = new Date(a.date || a.createdAt || a.timestamp || 0).getTime();
+      const bDate = new Date(b.date || b.createdAt || b.timestamp || 0).getTime();
+      return bDate - aDate;
+    });
+
+  const [patientPrescriptions, setPatientPrescriptions] = useState([]);
+  const [patientPayments, setPatientPayments] = useState([]);
+  const [patientMedicalRecords, setPatientMedicalRecords] = useState([]);
+
+  // API helpers
+  const tokenHeader = () => {
+    const t = localStorage.getItem("token");
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  };
+
+  async function loadPrescriptions() {
+    try {
+      const resp = await axios.get(`${API_BASE_URL}/prescriptions`, { headers: tokenHeader() });
+      const data = resp.data;
+      setPatientPrescriptions(sortByRecentDate(Array.isArray(data) ? data : []));
+    } catch (e) {
+      console.error("fetch prescriptions failed", e);
+      const cached = readStorageArray(PRESCRIPTIONS_STORAGE_KEY).filter(matchesCurrentPatient);
+      setPatientPrescriptions(sortByRecentDate(cached));
+    }
+  }
+  async function loadPayments() {
+    try {
+      const resp = await axios.get(`${API_BASE_URL}/payments`, { headers: tokenHeader() });
+      setPatientPayments(sortByRecentDate(Array.isArray(resp.data) ? resp.data : []));
+    } catch (e) {
+      console.error("fetch payments failed", e);
+      const cached = readStorageArray(PAYMENTS_STORAGE_KEY).filter(matchesCurrentPatient);
+      setPatientPayments(sortByRecentDate(cached));
+    }
+  }
+  async function loadMedicalRecords() {
+    try {
+      const resp = await axios.get(`${API_BASE_URL}/medical-records`, { headers: tokenHeader() });
+      setPatientMedicalRecords(sortByRecentDate(Array.isArray(resp.data) ? resp.data : []));
+    } catch (e) {
+      console.error("fetch medical records failed", e);
+      const keys = ["patientMedicalRecords", "medicalRecords", "medecinMedicalRecords"];
+      const cached = keys.flatMap((k) => readStorageArray(k)).filter(matchesCurrentPatient);
+      setPatientMedicalRecords(sortByRecentDate(cached));
+    }
+  }
+
+  // crud operations used maybe later
+  async function addMedicalRecord(body) {
+    const resp = await axios.post(`${API_BASE_URL}/medical-records`, body, { headers: { "Content-Type": "application/json", ...tokenHeader() } });
+    setPatientMedicalRecords((prev) => sortByRecentDate([resp.data, ...prev]));
+    setDocumentsVersion((v) => v + 1);
+    return resp.data;
+  }
+  async function updateMedicalRecord(id, body) {
+    const resp = await axios.put(`${API_BASE_URL}/medical-records/${id}`, body, { headers: { "Content-Type": "application/json", ...tokenHeader() } });
+    setPatientMedicalRecords((prev) => sortByRecentDate(prev.map((r) => (String(r.id) === String(id) ? resp.data : r))));
+    setDocumentsVersion((v) => v + 1);
+    return resp.data;
+  }
+  async function deleteMedicalRecord(id) {
+    await axios.delete(`${API_BASE_URL}/medical-records/${id}`, { headers: tokenHeader() });
+    setPatientMedicalRecords((prev) => prev.filter((r) => String(r.id) !== String(id)));
+    setDocumentsVersion((v) => v + 1);
+  }
+  async function addPayment(body) {
+    const resp = await axios.post(`${API_BASE_URL}/payments`, body, { headers: { "Content-Type": "application/json", ...tokenHeader() } });
+    setPatientPayments((prev) => sortByRecentDate([resp.data, ...prev]));
+    setDocumentsVersion((v) => v + 1);
+    return resp.data;
+  }
+  async function updatePayment(id, body) {
+    const resp = await axios.put(`${API_BASE_URL}/payments/${id}`, body, { headers: { "Content-Type": "application/json", ...tokenHeader() } });
+    setPatientPayments((prev) => sortByRecentDate(prev.map((p) => (String(p.id) === String(id) ? resp.data : p))));
+    setDocumentsVersion((v) => v + 1);
+    return resp.data;
+  }
+  async function deletePayment(id) {
+    await axios.delete(`${API_BASE_URL}/payments/${id}`, { headers: tokenHeader() });
+    setPatientPayments((prev) => prev.filter((p) => String(p.id) !== String(id)));
+    setDocumentsVersion((v) => v + 1);
+  }
+
+  useEffect(() => {
+    loadPrescriptions();
+    loadPayments();
+    loadMedicalRecords();
+  }, [patientIdentity, documentsVersion]);
+
+  const patientSportActivities = useMemo(() => {
+    const activities = readStorageArray(PATIENT_SPORTS_ACTIVITY_STORAGE_KEY);
+    const filtered = activities.filter((item) => {
+      if (!item || typeof item !== "object") return false;
+
+      const userId = String(item.userId || "").trim();
+      const userEmail = normalizeText(item.userEmail);
+      const userName = normalizeText(item.userName);
+
+      if (patientIdentity.id && userId && patientIdentity.id === userId) return true;
+      if (patientIdentity.email && userEmail && patientIdentity.email === userEmail) return true;
+      if (userName && patientIdentity.names.some((name) => name && (userName.includes(name) || name.includes(userName)))) return true;
+      return false;
+    });
+
+    return sortByRecentDate(filtered).slice(0, 80);
+  }, [patientIdentity, sportsVersion]);
 
   // Helper function to get JWT token from localStorage
   const getToken = () => localStorage.getItem("token");
@@ -175,6 +390,14 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
         existingHistory.splice(50);
       }
       localStorage.setItem('appHistory', JSON.stringify(existingHistory));
+
+      const activityEntries = readStorageArray(PATIENT_ACTIVITY_STORAGE_KEY);
+      activityEntries.unshift(localHistoryEntry);
+      if (activityEntries.length > 80) {
+        activityEntries.splice(80);
+      }
+      localStorage.setItem(PATIENT_ACTIVITY_STORAGE_KEY, JSON.stringify(activityEntries));
+      setHistoryVersion((prev) => prev + 1);
     } catch (error) {
       console.error("Error logging history:", error);
     }
@@ -215,7 +438,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
   };
 
   // Fetch user appointments
-  const fetchAppointments = async () => {
+  const fetchAppointments = async (silent = false) => {
     try {
       const response = await fetch(`${API_BASE_URL}/appointments/mine`, {
         headers: {
@@ -239,14 +462,18 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
         demande: a.demande,
         isNew: a.is_new || a.isNew,
       })));
-      appointments
-        .filter((rdv) => rdv.isNew)
-        .forEach((rdv) => {
-          toast.success(`Rendez-vous en attente : ${rdv.specialite || "Consultation"} le ${rdv.date} ÃƒÂ  ${rdv.time}`);
-        });
+      if (!silent) {
+        appointments
+          .filter((rdv) => rdv.isNew)
+          .forEach((rdv) => {
+            toast.success(`Rendez-vous en attente : ${rdv.specialite || "Consultation"} le ${rdv.date} ÃƒÂ  ${rdv.time}`);
+          });
+      }
     } catch (error) {
       console.error("Error fetching appointments:", error);
-      toast.error("Erreur lors de la rÃƒÂ©cupÃƒÂ©ration des rendez-vous.");
+      if (!silent) {
+        toast.error("Erreur lors de la rÃƒÂ©cupÃƒÂ©ration des rendez-vous.");
+      }
     }
   };
 
@@ -292,6 +519,36 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
       init();
     }
   }, [initialized]);
+
+  useEffect(() => {
+    if (secondaryView !== "statsPatient") return;
+
+    setLastPatientStatsRefresh(new Date().toISOString());
+    const intervalId = setInterval(() => {
+      setDocumentsVersion((prev) => prev + 1);
+      setSportsVersion((prev) => prev + 1);
+      setHistoryVersion((prev) => prev + 1);
+      setLastPatientStatsRefresh(new Date().toISOString());
+      fetchAppointments(true);
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [secondaryView]);
+
+  useEffect(() => {
+    const onStorage = (event) => {
+      if (!event.key) return;
+      if ([PRESCRIPTIONS_STORAGE_KEY, PAYMENTS_STORAGE_KEY, PATIENT_SPORTS_ACTIVITY_STORAGE_KEY, PATIENT_ACTIVITY_STORAGE_KEY].includes(event.key)) {
+        setDocumentsVersion((prev) => prev + 1);
+        setSportsVersion((prev) => prev + 1);
+        setHistoryVersion((prev) => prev + 1);
+        setLastPatientStatsRefresh(new Date().toISOString());
+      }
+    };
+
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const handleAddRdv = async () => {
     if (!selectedSpecialtyObj && !selectedSpecialty) {
@@ -494,6 +751,118 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
     return rdvDate >= today;
   };
 
+  const patientStats = useMemo(() => {
+    const totalRdv = rendezVous.length;
+    const upcomingRdv = rendezVous.filter((rdv) => isDateOnOrAfterToday(rdv.date)).length;
+    const pastRdv = totalRdv - upcomingRdv;
+    const pendingRdv = rendezVous.filter((rdv) => (rdv.status || "").toLowerCase().includes("attente")).length;
+    const cancelledRdv = rendezVous.filter((rdv) => (rdv.status || "").toLowerCase().includes("annul")).length;
+
+    const paidAmount = patientPayments
+      .filter((item) => item.status === "paye")
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const pendingAmount = patientPayments
+      .filter((item) => item.status === "en_attente")
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    return {
+      totalRdv,
+      upcomingRdv,
+      pastRdv,
+      pendingRdv,
+      cancelledRdv,
+      documentsCount: patientPrescriptions.length + patientMedicalRecords.length + patientPayments.length,
+      prescriptionsCount: patientPrescriptions.length,
+      medicalRecordsCount: patientMedicalRecords.length,
+      paymentsCount: patientPayments.length,
+      activitiesCount: patientSportActivities.length,
+      paidAmount,
+      pendingAmount,
+    };
+  }, [rendezVous, patientPrescriptions, patientMedicalRecords, patientPayments, patientSportActivities]);
+
+  const statsOverviewChartData = useMemo(
+    () => [
+      { name: "RDV", value: patientStats.totalRdv, fill: "#06b6d4" },
+      { name: "Documents", value: patientStats.documentsCount, fill: "#f59e0b" },
+      { name: "Sports", value: patientStats.activitiesCount, fill: "#ec4899" },
+      { name: "Paiements", value: patientStats.paymentsCount, fill: "#10b981" },
+    ],
+    [patientStats]
+  );
+
+  const rdvStatusChartData = useMemo(
+    () => [
+      { label: "A venir", count: patientStats.upcomingRdv },
+      { label: "Passes", count: patientStats.pastRdv },
+      { label: "En attente", count: patientStats.pendingRdv },
+      { label: "Annules", count: patientStats.cancelledRdv },
+    ],
+    [patientStats]
+  );
+
+  const paymentChartData = useMemo(
+    () => [
+      { label: "Paye", amount: patientStats.paidAmount },
+      { label: "En attente", amount: patientStats.pendingAmount },
+    ],
+    [patientStats]
+  );
+
+  const addSportActivity = async () => {
+    const sport = String(sportActivityForm.sport || "").trim();
+    const duration = Number(sportActivityForm.duration);
+    if (!sport) {
+      toast.error("Veuillez renseigner le sport pratique.");
+      return;
+    }
+    if (!Number.isFinite(duration) || duration <= 0) {
+      toast.error("La duree doit etre superieure a 0.");
+      return;
+    }
+
+    const entry = {
+      id: Date.now().toString(),
+      sport,
+      duration,
+      intensity: sportActivityForm.intensity || "moderee",
+      date: sportActivityForm.date || new Date().toISOString().split("T")[0],
+      note: sportActivityForm.note || "",
+      userId: String(currentUser?.id || ""),
+      userEmail: profile?.email || currentUser?.email || "",
+      userName: `${profile?.nom || ""} ${profile?.prenom || ""}`.trim() || currentUser?.username || "Patient",
+      createdAt: new Date().toISOString(),
+    };
+
+    const previous = readStorageArray(PATIENT_SPORTS_ACTIVITY_STORAGE_KEY);
+    const next = [entry, ...previous].slice(0, 120);
+    localStorage.setItem(PATIENT_SPORTS_ACTIVITY_STORAGE_KEY, JSON.stringify(next));
+    setSportsVersion((prev) => prev + 1);
+    setLastPatientStatsRefresh(new Date().toISOString());
+    setSportActivityForm({
+      sport: "",
+      duration: "",
+      intensity: "moderee",
+      date: new Date().toISOString().split("T")[0],
+      note: "",
+    });
+    await addToHistory("Activite sportive", `Ajout activite: ${sport} (${duration} min)`);
+    toast.success("Activite sportive enregistree.");
+  };
+
+  const deleteSportActivity = async (id) => {
+    const previous = readStorageArray(PATIENT_SPORTS_ACTIVITY_STORAGE_KEY);
+    const target = previous.find((item) => String(item.id) === String(id));
+    const next = previous.filter((item) => String(item.id) !== String(id));
+    localStorage.setItem(PATIENT_SPORTS_ACTIVITY_STORAGE_KEY, JSON.stringify(next));
+    setSportsVersion((prev) => prev + 1);
+    setLastPatientStatsRefresh(new Date().toISOString());
+    if (target) {
+      await addToHistory("Activite sportive", `Suppression activite: ${target.sport || "sport"}`);
+    }
+    toast.success("Activite sportive supprimee.");
+  };
+
   const calculateProfileCompletion = () => {
     const fields = ['nom', 'prenom', 'email', 'telephone', 'dateNaissance', 'adresse'];
     const filledFields = fields.filter(field => profile[field] && profile[field].trim() !== '').length;
@@ -561,7 +930,55 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
             aria-current={secondaryView === "mesRdv" ? "page" : undefined}
           >
             <CalendarCheck className="w-5 h-5" />
-            Mes RDV ({rendezVous.length})
+            Mes RDV
+          </Button>
+          <Button
+            variant={secondaryView === "mesDocuments" ? "default" : "ghost"}
+            className={`w-full justify-start gap-2 rounded-xl ${
+              secondaryView === "mesDocuments" ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white" : "text-gray-700"
+            } hover:bg-gradient-to-r hover:from-indigo-600 hover:to-violet-700 hover:text-white transition-all duration-300`}
+            onClick={() => navigateTo("mesDocuments")}
+            aria-label="Voir mes documents"
+            aria-current={secondaryView === "mesDocuments" ? "page" : undefined}
+          >
+            <FolderOpen className="w-5 h-5" />
+            Mes documents
+          </Button>
+          <Button
+            variant={secondaryView === "teleconsultation" ? "default" : "ghost"}
+            className={`w-full justify-start gap-2 rounded-xl ${
+              secondaryView === "teleconsultation" ? "bg-gradient-to-r from-sky-500 to-cyan-600 text-white" : "text-gray-700"
+            } hover:bg-gradient-to-r hover:from-sky-600 hover:to-cyan-700 hover:text-white transition-all duration-300`}
+            onClick={() => navigateTo("teleconsultation")}
+            aria-label="Ouvrir l'onglet teleconsultation"
+            aria-current={secondaryView === "teleconsultation" ? "page" : undefined}
+          >
+            <Video className="w-5 h-5" />
+            Teleconsultation
+          </Button>
+          <Button
+            variant={secondaryView === "statsPatient" ? "default" : "ghost"}
+            className={`w-full justify-start gap-2 rounded-xl ${
+              secondaryView === "statsPatient" ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white" : "text-gray-700"
+            } hover:bg-gradient-to-r hover:from-amber-600 hover:to-orange-700 hover:text-white transition-all duration-300`}
+            onClick={() => navigateTo("statsPatient")}
+            aria-label="Voir les statistiques patient"
+            aria-current={secondaryView === "statsPatient" ? "page" : undefined}
+          >
+            <BarChart3 className="w-5 h-5" />
+            Statistiques
+          </Button>
+          <Button
+            variant={secondaryView === "activites" ? "default" : "ghost"}
+            className={`w-full justify-start gap-2 rounded-xl ${
+              secondaryView === "activites" ? "bg-gradient-to-r from-rose-500 to-pink-600 text-white" : "text-gray-700"
+            } hover:bg-gradient-to-r hover:from-rose-600 hover:to-pink-700 hover:text-white transition-all duration-300`}
+            onClick={() => navigateTo("activites")}
+            aria-label="Voir les activites sportives pratiquees"
+            aria-current={secondaryView === "activites" ? "page" : undefined}
+          >
+            <Activity className="w-5 h-5" />
+            Activites sportives
           </Button>
           <Button
             variant={secondaryView === "messagerie" ? "default" : "ghost"}
@@ -905,6 +1322,467 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                 </div>
               ))}
             </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderMesDocumentsPage = () => {
+    const documentCards = [
+      {
+        key: "ordonnances",
+        title: "Ordonnances",
+        subtitle: "Envoyees par le medecin",
+        count: patientPrescriptions.length,
+        icon: FileText,
+        className: "from-indigo-500 to-violet-600",
+      },
+      {
+        key: "dossier",
+        title: "Dossier medical",
+        subtitle: "Historique et notes",
+        count: patientMedicalRecords.length,
+        icon: FolderOpen,
+        className: "from-cyan-500 to-sky-600",
+      },
+      {
+        key: "paiements",
+        title: "Paiements",
+        subtitle: "Factures et statuts",
+        count: patientPayments.length,
+        icon: Wallet,
+        className: "from-emerald-500 to-teal-600",
+      },
+    ];
+
+    const selected = documentCards.find((card) => card.key === activeDocumentCard) || documentCards[0];
+
+    return (
+      <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 mt-8 w-full">
+        <div className="p-6 border-b border-white/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h3 className="text-xl font-semibold text-gray-700 flex items-center gap-2">
+            <FolderOpen className="w-5 h-5" />
+            Mes documents
+          </h3>
+          <Button
+            variant="outline"
+            className="rounded-xl border-gray-200 text-gray-700 hover:bg-gray-100"
+            onClick={() => setDocumentsVersion((prev) => prev + 1)}
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Actualiser
+          </Button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {documentCards.map((card) => {
+              const Icon = card.icon;
+              const isActive = activeDocumentCard === card.key;
+              return (
+                <button
+                  key={card.key}
+                  type="button"
+                  onClick={() => setActiveDocumentCard(card.key)}
+                  className={`text-left rounded-2xl p-4 border transition-all ${
+                    isActive ? "border-transparent shadow-lg text-white" : "border-gray-200 bg-white hover:border-gray-300"
+                  } ${isActive ? `bg-gradient-to-r ${card.className}` : ""}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className={`text-xs ${isActive ? "text-white/80" : "text-gray-500"}`}>{card.subtitle}</p>
+                      <p className="text-lg font-semibold">{card.title}</p>
+                    </div>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <p className={`mt-4 text-2xl font-bold ${isActive ? "text-white" : "text-gray-700"}`}>{card.count}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-5">
+            <h4 className="text-lg font-semibold text-gray-700 mb-4">{selected.title}</h4>
+
+            {activeDocumentCard === "ordonnances" && (
+              <div className="space-y-3">
+                {patientPrescriptions.length === 0 ? (
+                  <p className="text-sm text-gray-500">Aucune ordonnance disponible pour le moment.</p>
+                ) : (
+                  patientPrescriptions.map((item) => (
+                    <div key={item.id || `${item.date}-${item.createdAt}`} className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                      <p className="font-medium text-gray-700">{item.doctor || "Medecin"} - {item.date ? new Date(item.date).toLocaleDateString("fr-FR") : "Date non definie"}</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Medicaments: {Array.isArray(item.medications) ? item.medications.length : 0}
+                      </p>
+                      <p className="text-sm text-gray-600">Instructions: {item.instructions || "Aucune instruction"}</p>
+                      <p className="text-xs text-gray-500 mt-2">
+                        {item.sentAt ? `Envoyee le ${new Date(item.sentAt).toLocaleString("fr-FR")}` : "Non marquee comme envoyee"}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {activeDocumentCard === "dossier" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+                  <Input placeholder="Titre" value={docForm.title} onChange={(e) => setDocForm((p) => ({ ...p, title: e.target.value }))} />
+                  <Input placeholder="Description" value={docForm.description} onChange={(e) => setDocForm((p) => ({ ...p, description: e.target.value }))} />
+                  <Input type="date" placeholder="Date" value={docForm.date} onChange={(e) => setDocForm((p) => ({ ...p, date: e.target.value }))} />
+                  <Button onClick={async () => {
+                    if (!docForm.title.trim()) return;
+                    try {
+                      if (editingDocId) {
+                        await updateMedicalRecord(editingDocId, { title: docForm.title, description: docForm.description, date: docForm.date });
+                        toast.success('Document mis à jour');
+                      } else {
+                        await addMedicalRecord({ title: docForm.title, description: docForm.description, date: docForm.date });
+                        toast.success('Document ajouté');
+                      }
+                      setDocForm({ title: "", description: "", date: "" });
+                      setEditingDocId(null);
+                    } catch (e) {
+                      console.error(e);
+                      toast.error('Erreur sauvegarde');
+                    }
+                  }} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                    <Plus className="w-4 h-4 mr-2" /> {editingDocId ? 'Modifier' : 'Ajouter'}
+                  </Button>
+                </div>
+                <div className="rounded-xl border border-cyan-100 bg-cyan-50/40 p-4">
+                  <p className="font-medium text-gray-700">
+                    {`${profile.nom || ""} ${profile.prenom || ""}`.trim() || currentUser?.username || "Patient"}
+                  </p>
+                  <p className="text-sm text-gray-600">Email: {profile.email || "Non defini"}</p>
+                  <p className="text-sm text-gray-600">Telephone: {profile.telephone || "Non defini"}</p>
+                </div>
+                {patientMedicalRecords.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-300 p-4">
+                    <p className="text-sm text-gray-600">Aucun dossier medical partage actuellement.</p>
+                    <p className="text-sm text-gray-500 mt-1">Les consultations et comptes-rendus apparaitront ici quand ils seront publies.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {patientMedicalRecords.map((record, index) => (
+                      <div key={record.id || `record-${index}`} className="rounded-xl border border-cyan-100 bg-cyan-50/50 p-4">
+                        <p className="font-medium text-gray-700">{record.title || record.type || "Compte-rendu medical"}</p>
+                        <p className="text-sm text-gray-600 mt-1">{record.description || record.notes || "Aucun detail."}</p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {record.date ? new Date(record.date).toLocaleDateString("fr-FR") : "Date non definie"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeDocumentCard === "paiements" && (
+              <div className="space-y-3">
+                {patientPayments.length === 0 ? (
+                  <p className="text-sm text-gray-500">Aucun paiement enregistre pour le moment.</p>
+                ) : (
+                  patientPayments.map((payment) => {
+                    const status = payment.status || "en_attente";
+                    const statusClass =
+                      status === "paye"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : status === "annule"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-amber-100 text-amber-700";
+                    const statusLabel = status === "paye" ? "Paye" : status === "annule" ? "Annule" : "En attente";
+                    return (
+                      <div key={payment.id || payment.reference} className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <p className="font-medium text-gray-700">{Number(payment.amount || 0).toLocaleString("fr-FR")} Ar</p>
+                          <Badge className={statusClass}>{statusLabel}</Badge>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {payment.reference || "Ref non definie"} - {payment.method || "methode non definie"}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {payment.date ? new Date(payment.date).toLocaleDateString("fr-FR") : "Date non definie"}
+                        </p>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderTeleconsultationPage = () => {
+    const upcomingAppointments = rendezVous
+      .filter((rdv) => isDateOnOrAfterToday(rdv.date))
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    return (
+      <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 mt-8 w-full">
+        <div className="p-6 border-b border-white/30">
+          <h3 className="text-xl font-semibold text-gray-700 text-center w-full flex items-center justify-center gap-2">
+            <Video className="w-5 h-5" />
+            Teleconsultation
+          </h3>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button
+              className="h-14 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-600 hover:from-sky-600 hover:to-cyan-700 text-white"
+              onClick={() => {
+                navigateTo("messagerie");
+                addToHistory("Teleconsultation", "Acces direct a la messagerie depuis teleconsultation");
+              }}
+            >
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Ouvrir la messagerie medecin
+            </Button>
+            <Button
+              variant="outline"
+              className="h-14 rounded-xl border-gray-200 text-gray-700 hover:bg-gray-100"
+              onClick={() => setSecondaryView("mesRdv")}
+            >
+              <CalendarCheck className="w-4 h-4 mr-2" />
+              Voir mes RDV teleconsultation
+            </Button>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 p-4">
+            <h4 className="font-semibold text-gray-700 mb-3">Sessions a venir</h4>
+            {upcomingAppointments.length === 0 ? (
+              <p className="text-sm text-gray-500">Aucune session de teleconsultation planifiee.</p>
+            ) : (
+              <div className="space-y-3">
+                {upcomingAppointments.map((rdv) => (
+                  <div key={rdv.id} className="rounded-xl border border-sky-100 bg-sky-50/50 p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-gray-700">{rdv.specialite || "Consultation"}</p>
+                      <p className="text-sm text-gray-600">
+                        {new Date(rdv.date).toLocaleDateString("fr-FR")} a {rdv.time}
+                      </p>
+                      <p className="text-sm text-gray-500">{rdv.demande || "Motif non specifie"}</p>
+                    </div>
+                    <Button
+                      className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white"
+                      onClick={() => {
+                        toast.info("Session teleconsultation", { description: "Passage vers la messagerie en attendant la video integree." });
+                        navigateTo("messagerie");
+                        addToHistory("Teleconsultation", `Demarrage teleconsultation du ${rdv.date} a ${rdv.time}`);
+                      }}
+                    >
+                      Demarrer
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderStatsPatientPage = () => (
+    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 mt-8 w-full">
+      <div className="p-6 border-b border-white/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h3 className="text-xl font-semibold text-gray-700 flex items-center gap-2">
+          <BarChart3 className="w-5 h-5" />
+          Statistiques patient (temps reel)
+        </h3>
+        <Button
+          variant="outline"
+          className="rounded-xl border-gray-200 text-gray-700 hover:bg-gray-100"
+          onClick={() => {
+            setDocumentsVersion((prev) => prev + 1);
+            setSportsVersion((prev) => prev + 1);
+            setHistoryVersion((prev) => prev + 1);
+            setLastPatientStatsRefresh(new Date().toISOString());
+            fetchAppointments(true);
+          }}
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Rafraichir
+        </Button>
+      </div>
+      <div className="p-6 space-y-6">
+        <p className="text-xs text-gray-500">
+          Derniere synchronisation: {lastPatientStatsRefresh ? new Date(lastPatientStatsRefresh).toLocaleTimeString("fr-FR") : "--:--:--"}
+        </p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-gray-200 p-4">
+            <h4 className="font-semibold text-gray-700 mb-3">Diagramme global</h4>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={statsOverviewChartData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={4}>
+                    {statsOverviewChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 p-4">
+            <h4 className="font-semibold text-gray-700 mb-3">Repartition des rendez-vous</h4>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={rdvStatusChartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#06b6d4" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-gray-200 p-4">
+            <h4 className="font-semibold text-gray-700 mb-3">Diagramme paiements (Ar)</h4>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={paymentChartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => `${Number(value || 0).toLocaleString("fr-FR")} Ar`} />
+                  <Bar dataKey="amount" fill="#10b981" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="rounded-xl border border-gray-200 p-4">
+            <h4 className="font-semibold text-gray-700 mb-3">Indicateurs rapides</h4>
+            <div className="space-y-2 text-sm">
+              <p className="flex items-center justify-between"><span>Total RDV</span><span className="font-medium">{patientStats.totalRdv}</span></p>
+              <p className="flex items-center justify-between"><span>Documents</span><span className="font-medium">{patientStats.documentsCount}</span></p>
+              <p className="flex items-center justify-between"><span>Activites sportives</span><span className="font-medium">{patientStats.activitiesCount}</span></p>
+              <p className="flex items-center justify-between"><span>Paiements enregistres</span><span className="font-medium">{patientStats.paymentsCount}</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderPatientActivitiesPage = () => (
+    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 mt-8 w-full">
+      <div className="p-6 border-b border-white/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h3 className="text-xl font-semibold text-gray-700 flex items-center gap-2">
+          <Activity className="w-5 h-5" />
+          Activites sportives pratiquees
+        </h3>
+        <Button
+          variant="outline"
+          className="rounded-xl border-gray-200 text-gray-700 hover:bg-gray-100"
+          onClick={() => setSportsVersion((prev) => prev + 1)}
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Actualiser
+        </Button>
+      </div>
+      <div className="p-6 space-y-6">
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <h4 className="font-semibold text-gray-700 mb-4">Ajouter une activite sportive</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <Label className="mb-2 block text-sm font-medium text-gray-700">Sport</Label>
+              <Input
+                value={sportActivityForm.sport}
+                onChange={(e) => setSportActivityForm((prev) => ({ ...prev, sport: e.target.value }))}
+                placeholder="Ex: Course, Football, Yoga"
+                className="rounded-xl"
+              />
+            </div>
+            <div>
+              <Label className="mb-2 block text-sm font-medium text-gray-700">Duree (minutes)</Label>
+              <Input
+                type="number"
+                min="1"
+                value={sportActivityForm.duration}
+                onChange={(e) => setSportActivityForm((prev) => ({ ...prev, duration: e.target.value }))}
+                className="rounded-xl"
+              />
+            </div>
+            <div>
+              <Label className="mb-2 block text-sm font-medium text-gray-700">Date</Label>
+              <Input
+                type="date"
+                value={sportActivityForm.date}
+                onChange={(e) => setSportActivityForm((prev) => ({ ...prev, date: e.target.value }))}
+                className="rounded-xl"
+              />
+            </div>
+            <div>
+              <Label className="mb-2 block text-sm font-medium text-gray-700">Intensite</Label>
+              <select
+                value={sportActivityForm.intensity}
+                onChange={(e) => setSportActivityForm((prev) => ({ ...prev, intensity: e.target.value }))}
+                className="w-full rounded-xl px-4 py-3 border border-gray-200"
+              >
+                <option value="faible">Faible</option>
+                <option value="moderee">Moderee</option>
+                <option value="intense">Intense</option>
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <Label className="mb-2 block text-sm font-medium text-gray-700">Note</Label>
+              <Input
+                value={sportActivityForm.note}
+                onChange={(e) => setSportActivityForm((prev) => ({ ...prev, note: e.target.value }))}
+                placeholder="Commentaire optionnel"
+                className="rounded-xl"
+              />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button
+              className="bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white rounded-xl"
+              onClick={addSportActivity}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Ajouter
+            </Button>
+          </div>
+        </div>
+
+        {patientSportActivities.length === 0 ? (
+          <p className="text-sm text-gray-500">Aucune activite sportive enregistree pour le moment.</p>
+        ) : (
+          <div className="space-y-3">
+            {patientSportActivities.map((item) => (
+              <div key={item.id} className="rounded-xl border border-rose-100 bg-rose-50/40 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <p className="font-medium text-gray-700">{item.sport}</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {item.duration} min - Intensite: {item.intensity || "moderee"} - {item.date ? new Date(item.date).toLocaleDateString("fr-FR") : "Date non definie"}
+                  </p>
+                  {item.note ? <p className="text-sm text-gray-500 mt-1">{item.note}</p> : null}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-xl border-red-200 text-red-600 hover:bg-red-600 hover:text-white"
+                  onClick={() => deleteSportActivity(item.id)}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Supprimer
+                </Button>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -1422,6 +2300,10 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
           {renderHeader()}
           {secondaryView === "accueil" && renderAccueilPage()}
           {secondaryView === "mesRdv" && renderMesRdvPage()}
+          {secondaryView === "mesDocuments" && renderMesDocumentsPage()}
+          {secondaryView === "teleconsultation" && renderTeleconsultationPage()}
+          {secondaryView === "statsPatient" && renderStatsPatientPage()}
+          {secondaryView === "activites" && renderPatientActivitiesPage()}
           {secondaryView === "messagerie" && renderMessageriePage()}
           {secondaryView === "profil" && renderProfilPage()}
           {secondaryView === "prendreRdv" && renderAccueilPage()}

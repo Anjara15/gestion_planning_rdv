@@ -1,27 +1,34 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MessageSquare, Send, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const STORAGE_KEY = "cabinet_messages_v1";
+// messaging now persisted on server side via API
+import axios from "axios";
 
-const readStoredMessages = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.error("Erreur lecture messagerie locale:", error);
-    return [];
-  }
+// derive API base url same way as other components
+const _apiBaseRaw = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const _apiBase = String(_apiBaseRaw).replace(/\/+$/, "");
+const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
+
+const fetchThread = async (fromRole, toRole) => {
+  const token = localStorage.getItem("token");
+  const resp = await axios.get(`${API_BASE_URL}/messages`, {
+    params: { fromRole, toRole },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return resp.data;
 };
 
-const writeStoredMessages = (messages) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-  } catch (error) {
-    console.error("Erreur sauvegarde messagerie locale:", error);
-  }
+const postMessage = async (message) => {
+  const token = localStorage.getItem("token");
+  const resp = await axios.post(`${API_BASE_URL}/messages`, message, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  return resp.data;
 };
 
 const resolveCurrentUser = (currentUser, userRole) => {
@@ -53,44 +60,56 @@ const MessagingPanel = ({ currentUser, userRole, addToHistory }) => {
   const me = resolveCurrentUser(currentUser, userRole);
   const peerRole = me.role === "medecin" ? "patient" : "medecin";
   const [draft, setDraft] = useState("");
-  const [messages, setMessages] = useState(() => readStoredMessages());
+  const [messages, setMessages] = useState([]);
 
   const thread = useMemo(() => {
-    return messages
-      .filter(
-        (m) =>
-          (m.fromRole === me.role && m.toRole === peerRole) ||
-          (m.fromRole === peerRole && m.toRole === me.role)
-      )
-      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  }, [messages, me.role, peerRole]);
+    // assume messages loaded already correspond to the current conversation
+    return [...messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }, [messages]);
 
   const sendMessage = async () => {
     const content = draft.trim();
     if (!content) return;
 
     const nextMessage = {
-      id: `msg_${Date.now()}`,
       fromId: me.id,
       fromName: me.username,
       fromRole: me.role,
       toRole: peerRole,
       content,
-      createdAt: new Date().toISOString(),
     };
 
-    const next = [...messages, nextMessage];
-    setMessages(next);
-    writeStoredMessages(next);
-    setDraft("");
-
-    if (addToHistory) {
-      await addToHistory(
-        "Message envoyé",
-        `Message envoyé vers ${peerRole}: ${content.slice(0, 80)}`
-      );
+    try {
+      const saved = await postMessage(nextMessage);
+      setMessages((prev) => [...prev, saved]);
+      setDraft("");
+      if (addToHistory) {
+        await addToHistory(
+          "Message envoyé",
+          `Message envoyé vers ${peerRole}: ${content.slice(0, 80)}`
+        );
+      }
+    } catch (err) {
+      console.error("Erreur envoi message:", err);
     }
   };
+
+  // fetch messages when roles change
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const msgs = await fetchThread(me.role, peerRole);
+        if (!cancelled) setMessages(msgs);
+      } catch (err) {
+        console.error("Erreur chargement messagerie:", err);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [me.role, peerRole]);
 
   return (
     <div className="space-y-4">

@@ -6,8 +6,16 @@ import MedecinDashboard from "./MedecinDashboard";
 
 import RdvPage from "./section/RdvPage";
 import TimeSlotsAdmin from "./section/TimeSlotsAdmin";
+import AdminInventoryStock from "./section/AdminInventoryStock";
+import AdminAuditLog from "./section/AdminAuditLog";
+import AdminBillingPayments from "./section/AdminBillingPayments";
+import AdminConfiguration from "./section/AdminConfiguration";
+import AdminArchive from "./section/AdminArchive";
+import AdminAIAssistant from "./section/AdminAIAssistant";
+import AdminEmergency from "./section/AdminEmergency";
+import AdminMedicalRecords from "./section/AdminMedicalRecords";
 
-import { Users2, CalendarCheck, X, Bell, History, Plus, UserCheck, Stethoscope, Search, Menu, BarChart3, LogOut, User, AlertTriangle, FileText, Archive } from "lucide-react";
+import { Users2, CalendarCheck, X, Bell, History, Plus, UserCheck, Stethoscope, Search, Menu, BarChart3, LogOut, User, AlertTriangle, FileText, Archive, Package, CreditCard, Settings2, Bot } from "lucide-react";
 import Swal from 'sweetalert2';
 import axios from "axios";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -17,11 +25,15 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } fro
 import React from "react";
 import { toast as sonnerToast } from "sonner";
 
+const _apiBaseRaw = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const _apiBase = String(_apiBaseRaw).replace(/\/+$/, "");
+const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
+
 const Dashboard = () => {
   const [role, setRole] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
-  const [activeView, setActiveView] = useState("users");
+  const [activeView, setActiveView] = useState("stats");
   const [activeUserTab, setActiveUserTab] = useState("all");
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [userSortConfig, setUserSortConfig] = useState({ key: "username", direction: "asc" });
@@ -38,6 +50,7 @@ const Dashboard = () => {
   const [timeSlots, setTimeSlots] = useState([]);
   const [timeSlotsTotal, setTimeSlotsTotal] = useState(0);
   const [serverStats, setServerStats] = useState(null);
+  const [lastStatsRefresh, setLastStatsRefresh] = useState(null);
 
   const [showAlerts, setShowAlerts] = useState(false);
   const [alerts, setAlerts] = useState([]);
@@ -53,12 +66,15 @@ const Dashboard = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showPatientModal, setShowPatientModal] = useState(false);
 
+  const patientList = useMemo(() => users.filter((u) => u.role === "patient"), [users]);
+  const medecinList = useMemo(() => users.filter((u) => u.role === "medecin"), [users]);
+
   const navigate = useNavigate();
 
   // Keep a stable API client to avoid repeated effects and duplicate calls.
   const api = useMemo(() => {
     return axios.create({
-      baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api",
+      baseURL: API_BASE_URL,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -494,44 +510,58 @@ const Dashboard = () => {
     setUserSortConfig({ key, direction });
   };
 
+  const transformServerStats = (data) => {
+    const userRoleData = [
+      { name: "Patients", value: data.totalPatients || 0, fill: "#3b82f6" },
+      { name: "Medecins", value: data.totalMedecins || 0, fill: "#10b981" },
+    ];
+
+    const appointmentCounts = {};
+    (data.recentActivity || []).forEach((a) => {
+      const date = new Date(a.date).toLocaleDateString("fr-FR");
+      appointmentCounts[date] = (appointmentCounts[date] || 0) + 1;
+    });
+
+    const appointmentData = Object.entries(appointmentCounts)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    return { ...data, userRoleData, appointmentData };
+  };
+
+  const fetchServerStats = async (silent = false) => {
+    try {
+      const resp = await api.get("/stats");
+      const data = resp.data || {};
+      setServerStats(transformServerStats(data));
+      setLastStatsRefresh(new Date().toISOString());
+    } catch (err) {
+      console.error("Error fetching server stats:", err);
+      if (!silent) {
+        sonnerToast.error("Erreur lors de la recuperation des statistiques.");
+      }
+      setServerStats(null);
+    }
+  };
+
   // Show stats view
   const handleShowStats = () => {
     setActiveView("stats");
     addToHistory("Consultation statistiques", "Ouverture de la page des statistiques");
     setIsSidebarOpen(false);
-    (async () => {
-      try {
-        const resp = await api.get('/stats');
-        const data = resp.data;
-        // Transform backend stats into shapes used by charts
-        if (currentUser && currentUser.role === 'medecin') {
-          const userRoleData = [
-            { name: 'Patients', value: data.totalPatients || 0, fill: '#3b82f6' },
-            { name: 'Rendez-vous', value: data.totalAppointments || 0, fill: '#10b981' },
-          ];
-          const appointmentData = (data.appointmentsByMonth || []).map(item => ({ date: item.month, count: item.count }));
-          setServerStats({ ...data, userRoleData, appointmentData });
-        } else {
-          const userRoleData = [
-            { name: 'Patients', value: data.totalPatients || 0, fill: '#3b82f6' },
-            { name: 'MÃ©decins', value: data.totalMedecins || 0, fill: '#10b981' },
-          ];
-          // Build appointmentData from recentActivity counts grouped by date
-          const appointmentCounts = {};
-          (data.recentActivity || []).forEach(a => {
-            const d = new Date(a.date).toLocaleDateString('fr-FR');
-            appointmentCounts[d] = (appointmentCounts[d] || 0) + 1;
-          });
-          const appointmentData = Object.entries(appointmentCounts).map(([date, count]) => ({ date, count }));
-          setServerStats({ ...data, userRoleData, appointmentData });
-        }
-      } catch (err) {
-        console.error('Error fetching server stats:', err);
-        setServerStats(null);
-      }
-    })();
+    fetchServerStats();
   };
 
+  useEffect(() => {
+    if (!["admin", "staff"].includes(role) || activeView !== "stats") return;
+
+    fetchServerStats(true);
+    const intervalId = setInterval(() => {
+      fetchServerStats(true);
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [role, activeView]);
 
 
   // Memoized chart components to prevent unnecessary re-renders
@@ -692,46 +722,43 @@ const Dashboard = () => {
           </div>
           <nav className="flex-1 p-4 space-y-2">
             {[
-              { view: "users", icon: Users2, label: `Utilisateurs (${users.length})` },
-              { view: "appointments", icon: CalendarCheck, label: `Rendez-vous (${rendezVous.length})` },
-              { view: "archive", icon: Archive, label: "Archive" },
-              { view: "emergency", icon: AlertTriangle, label: "Urgences" },
-              { view: "medical-records", icon: FileText, label: "Dossiers MÃ©dicaux" },
+              { view: "archive", icon: Archive, label: "Archives" },
+              { view: "ai-assistants", icon: Bot, label: "Assistants IA" },
+              { view: "configuration", icon: Settings2, label: "Configuration" },
+              { view: "timeslots", icon: CalendarCheck, label: "Creneaux admin" },
+              { view: "medical-records", icon: FileText, label: "Dossiers medicaux" },
+              { view: "billing", icon: CreditCard, label: "Facturation et paiement" },
+              { view: "inventory-stock", icon: Package, label: "Inventaire et stock" },
+              { view: "audit-log", icon: History, label: "Journal d'audit" },
+              { view: "appointments", icon: CalendarCheck, label: "Rendez-vous" },
               { view: "stats", icon: BarChart3, label: "Statistiques" },
-              { view: "timeslots", icon: CalendarCheck, label: `CrÃ©neaux (Admin) (${timeSlotsTotal > 0 ? timeSlotsTotal : timeSlots.length})` },
-            ].map(({ view, icon, label }) => (
-              <Button
-                key={view}
-                variant={activeView === view ? "default" : "ghost"}
-                className={`w-full justify-start gap-2 rounded-xl text-sm ${activeView === view ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white" : "text-gray-700"} hover:bg-gradient-to-r hover:from-cyan-600 hover:to-blue-700 hover:text-white transition-all duration-300`}
-                onClick={() => {
-                  if (view === "stats") {
-                    handleShowStats();
-                  } else if (view === "appointments") {
-                    handleShowRendezVous();
-                  } else if (view === "emergency") {
-                    setActiveView("emergency");
-                    addToHistory("Consultation urgences", "Ouverture de la page des urgences");
-                    setIsSidebarOpen(false);
-                  } else if (view === "medical-records") {
-                    setActiveView("medical-records");
-                    addToHistory("Consultation dossiers mÃ©dicaux", "Ouverture de la page des dossiers mÃ©dicaux");
-                    setIsSidebarOpen(false);
-                  } else if (view === "archive") {
-                    handleShowArchive();
-                  } else if (view === "timeslots") {
-                    setActiveView("timeslots");
-                    addToHistory("Consultation crÃ©neaux", "Ouverture de la page des crÃ©neaux (admin)");
-                    setIsSidebarOpen(false);
-                  } else {
-                    handleShowUsers();
-                  }
-                }}
-              >
-                {React.createElement(icon, { className: "w-5 h-5" })}
-                {label}
-              </Button>
-            ))}
+              { view: "emergency", icon: AlertTriangle, label: "Urgences" },
+              { view: "users", icon: Users2, label: "Utilisateurs" },
+            ]
+              .sort((a, b) => a.label.localeCompare(b.label, "fr", { sensitivity: "base" }))
+              .map(({ view, icon, label }) => (
+                <Button
+                  key={view}
+                  variant={activeView === view ? "default" : "ghost"}
+                  className={`w-full justify-start gap-2 rounded-xl text-sm ${activeView === view ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white" : "text-gray-700"} hover:bg-gradient-to-r hover:from-cyan-600 hover:to-blue-700 hover:text-white transition-all duration-300`}
+                  onClick={() => {
+                    if (view === "stats") {
+                      handleShowStats();
+                    } else if (view === "appointments") {
+                      handleShowRendezVous();
+                    } else if (view === "users") {
+                      handleShowUsers();
+                    } else {
+                      setActiveView(view);
+                      addToHistory("Navigation", `Ouverture de la vue ${view}`);
+                      setIsSidebarOpen(false);
+                    }
+                  }}
+                >
+                  {React.createElement(icon, { className: "w-5 h-5" })}
+                  {label}
+                </Button>
+              ))}
           </nav>
         </div>
         {isSidebarOpen && (
@@ -921,33 +948,6 @@ const Dashboard = () => {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 sm:p-6 bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 text-center transition-all duration-300 hover:shadow-xl">
-                <Users2 className="w-6 h-6 sm:w-7 sm:h-7 text-blue-500 mx-auto mb-2" />
-                <h4 className="text-base sm:text-lg font-semibold text-gray-700">{patientCount}</h4>
-                <p className="text-xs sm:text-sm text-gray-500">Patients</p>
-              </div>
-              <div className="p-4 sm:p-6 bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 text-center transition-all duration-300 hover:shadow-xl">
-                <Stethoscope className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-500 mx-auto mb-2" />
-                <h4 className="text-base sm:text-lg font-semibold text-gray-700">{medecinCount}</h4>
-                <p className="text-xs sm:text-sm text-gray-500">MÃ©decins</p>
-              </div>
-              <div className="p-4 sm:p-6 bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 text-center transition-all duration-300 hover:shadow-xl">
-                <CalendarCheck className="w-6 h-6 sm:w-7 sm:h-7 text-orange-500 mx-auto mb-2" />
-                <h4 className="text-base sm:text-lg font-semibold text-gray-700">{timeSlotsTotal > 0 ? timeSlotsTotal : timeSlots.length}</h4>
-                <p className="text-xs sm:text-sm text-gray-500">CrÃ©neaux</p>
-              </div>
-              <div className="p-4 sm:p-6 bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 text-center transition-all duration-300 hover:shadow-xl">
-                <CalendarCheck className="w-6 h-6 sm:w-7 sm:h-7 text-purple-500 mx-auto mb-2" />
-                <h4 className="text-base sm:text-lg font-semibold text-gray-700">{rendezVous.length}</h4>
-                <p className="text-xs sm:text-sm text-gray-500">Rendez-vous</p>
-              </div>
-              <div className="p-4 sm:p-6 bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 text-center transition-all duration-300 hover:shadow-xl">
-                <Bell className="w-6 h-6 sm:w-7 sm:h-7 text-red-500 mx-auto mb-2" />
-                <h4 className="text-base sm:text-lg font-semibold text-gray-700">{alerts.length}</h4>
-                <p className="text-xs sm:text-sm text-gray-500">Alertes</p>
-              </div>
-            </div>
             <div className="transition-opacity duration-300 animate-fade-in">
               {activeView === "profil" && renderProfilPage()}
 
@@ -960,7 +960,10 @@ const Dashboard = () => {
               {activeView === "users" && (
                 <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 p-4 sm:p-6">
                   <div className="flex justify-between items-center mb-4 sm:mb-6">
-                    <h3 className="text-xl sm:text-2xl font-semibold text-gray-700">Gestion des utilisateurs</h3>
+                    <div>
+                      <h3 className="text-xl sm:text-2xl font-semibold text-gray-700">Gestion des utilisateurs</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1">Vue amelioree: filtres rapides, recherche et actions directes.</p>
+                    </div>
                     <Button
                       onClick={() => setShowAddModal(true)}
                       className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl text-xs sm:text-sm"
@@ -968,6 +971,12 @@ const Dashboard = () => {
                       <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                       Ajouter
                     </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span className="px-3 py-1 rounded-full bg-cyan-100 text-cyan-700 text-xs font-medium">Total: {users.length}</span>
+                    <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">Patients: {patientCount}</span>
+                    <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium">Medecins: {medecinCount}</span>
+                    <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">Affiches: {displayUsers.length}</span>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
                     <Button
@@ -1019,7 +1028,7 @@ const Dashboard = () => {
                       <table className="w-full border-collapse border border-white/30">
                         <thead className="bg-gray-50/80">
                           <tr>
-                            <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700">Nom du patient</th>
+                            <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700">Nom utilisateur</th>
                             <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700 hidden md:table-cell">Ã‚ge</th>
                             <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700 hidden lg:table-cell">Email</th>
                             <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700 hidden xl:table-cell">Téléphone</th>
@@ -1072,143 +1081,87 @@ const Dashboard = () => {
               {activeView === "appointments" && (
                 <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 p-4 sm:p-6">
                   <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl sm:text-2xl font-semibold text-gray-700">Tous les rendez-vous</h3>
-                    
+                    <div>
+                      <h3 className="text-xl sm:text-2xl font-semibold text-gray-700">Tous les rendez-vous</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1">Interface amelioree pour la gestion centralisee des RDV.</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setActiveView("archive")}
+                      className="rounded-xl border-gray-200 text-gray-700 hover:bg-gray-100"
+                    >
+                      Voir archives
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-medium">Total RDV: {rendezVous.length}</span>
+                    <span className="px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-medium">Vue admin en temps reel</span>
                   </div>
                   <RdvPage rendezVous={rendezVous} setRendezVous={setRendezVous} addToHistory={addToHistory} />
                 </div>
               )}
               {activeView === "archive" && (
-                <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 p-4 sm:p-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl sm:text-2xl font-semibold text-gray-700">Archive des rendez-vous</h3>
-                  </div>
-                  <RdvPage rendezVous={rendezVous} setRendezVous={setRendezVous} addToHistory={addToHistory} />
-                </div>
+                <AdminArchive api={api} />
+              )}
+              {activeView === "inventory-stock" && (
+                <AdminInventoryStock addToHistory={addToHistory} currentUser={currentUser} />
+              )}
+              {activeView === "audit-log" && (
+                <AdminAuditLog api={api} />
+              )}
+              {activeView === "billing" && (
+                <AdminBillingPayments addToHistory={addToHistory} currentUser={currentUser} />
+              )}
+              {activeView === "configuration" && (
+                <AdminConfiguration addToHistory={addToHistory} currentUser={currentUser} />
+              )}
+              {activeView === "ai-assistants" && (
+                <AdminAIAssistant addToHistory={addToHistory} currentUser={currentUser} />
               )}
               {activeView === "emergency" && (
-                <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 p-4 sm:p-6">
-                  <h3 className="text-xl sm:text-2xl font-semibold text-gray-700 text-center mb-6 flex items-center justify-center gap-2">
-                    <AlertTriangle className="w-6 h-6 text-red-500" />
-                    Gestion des Urgences
-                  </h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <h4 className="text-lg font-semibold text-gray-700 mb-4">Urgences Actives</h4>
-                      <div className="space-y-3">
-                        <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h5 className="font-semibold text-red-800">Urgence Critique - Patient X</h5>
-                              <p className="text-sm text-red-600">Cardiaque - ArrivÃ© il y a 5 min</p>
-                            </div>
-                            <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white">
-                              Prendre en charge
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h5 className="font-semibold text-orange-800">Urgence ModÃ©rÃ©e - Patient Y</h5>
-                              <p className="text-sm text-orange-600">Traumatisme - Attente: 15 min</p>
-                            </div>
-                            <Button size="sm" variant="outline" className="border-orange-300 text-orange-700">
-                              Voir dÃ©tails
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <h4 className="text-lg font-semibold text-gray-700 mb-4">Actions Rapides</h4>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Button className="bg-red-500 hover:bg-red-600 text-white h-16 flex flex-col items-center justify-center">
-                          <AlertTriangle className="w-5 h-5 mb-1" />
-                          Nouvelle Urgence
-                        </Button>
-                        <Button variant="outline" className="border-blue-300 text-blue-700 h-16 flex flex-col items-center justify-center">
-                          <Users className="w-5 h-5 mb-1" />
-                          Ã‰quipe Disponible
-                        </Button>
-                        <Button variant="outline" className="border-green-300 text-green-700 h-16 flex flex-col items-center justify-center">
-                          <CalendarCheck className="w-5 h-5 mb-1" />
-                          Salles Libres
-                        </Button>
-                        <Button variant="outline" className="border-purple-300 text-purple-700 h-16 flex flex-col items-center justify-center">
-                          <BarChart3 className="w-5 h-5 mb-1" />
-                          Statistiques
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <AdminEmergency
+                  addToHistory={addToHistory}
+                  currentUser={currentUser}
+                  patients={patientList}
+                />
               )}
               {activeView === "medical-records" && (
-                <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 p-4 sm:p-6">
-                  <h3 className="text-xl sm:text-2xl font-semibold text-gray-700 text-center mb-6 flex items-center justify-center gap-2">
-                    <FileText className="w-6 h-6 text-blue-500" />
-                    Dossiers MÃ©dicaux
-                  </h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <h4 className="text-lg font-semibold text-gray-700 mb-4">Recherche de Dossiers</h4>
-                      <div className="space-y-3">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
-                          <input
-                            type="text"
-                            placeholder="Rechercher par nom de patient..."
-                            className="w-full rounded-xl px-10 py-3 border border-gray-200 focus:ring-4 focus:ring-blue-500/50 focus:outline-none"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <Button variant="outline" className="border-blue-300 text-blue-700">
-                            <Search className="w-4 h-4 mr-2" />
-                            Rechercher
-                          </Button>
-                          <Button variant="outline" className="border-green-300 text-green-700">
-                            <FileText className="w-4 h-4 mr-2" />
-                            Nouveau Dossier
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <h4 className="text-lg font-semibold text-gray-700 mb-4">Dossiers RÃ©cents</h4>
-                      <div className="space-y-3">
-                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl cursor-pointer hover:bg-blue-100 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h5 className="font-semibold text-blue-800">Patient Dupont Marie</h5>
-                              <p className="text-sm text-blue-600">Consultation gÃ©nÃ©rale - 15/12/2024</p>
-                            </div>
-                            <Button size="sm" variant="outline" className="border-blue-300 text-blue-700">
-                              Voir
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="p-4 bg-green-50 border border-green-200 rounded-xl cursor-pointer hover:bg-green-100 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h5 className="font-semibold text-green-800">Patient Martin Jean</h5>
-                              <p className="text-sm text-green-600">Suivi cardiologique - 14/12/2024</p>
-                            </div>
-                            <Button size="sm" variant="outline" className="border-green-300 text-green-700">
-                              Voir
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <AdminMedicalRecords
+                  addToHistory={addToHistory}
+                  currentUser={currentUser}
+                  patients={patientList}
+                  medecins={medecinList}
+                />
               )}
               {activeView === "stats" && (
                 <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 p-4 sm:p-6">
-                  <h3 className="text-xl sm:text-2xl font-semibold text-gray-700 text-center mb-6">Statistiques du SystÃ¨me</h3>
+                  <h3 className="text-xl sm:text-2xl font-semibold text-gray-700 text-center mb-2">Statistiques du Systeme (temps reel)</h3>
+                  <p className="text-center text-xs text-gray-500 mb-6">
+                    Derniere synchronisation: {lastStatsRefresh ? new Date(lastStatsRefresh).toLocaleTimeString("fr-FR") : "--:--:--"}
+                  </p>
                   {stats ? (
                     <div className="space-y-6 sm:space-y-8">
+                      <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 p-4 sm:p-6">
+                        <h4 className="text-base sm:text-lg font-semibold text-gray-700 mb-4 text-center">Indicateurs globaux d'utilisation</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                          <div className="p-3 rounded-xl border border-gray-200 bg-gray-50/80">
+                            <p className="text-gray-500">Utilisateurs</p>
+                            <p className="font-semibold text-gray-700">{stats.totalUsers ?? users.length}</p>
+                          </div>
+                          <div className="p-3 rounded-xl border border-gray-200 bg-gray-50/80">
+                            <p className="text-gray-500">Patients</p>
+                            <p className="font-semibold text-gray-700">{stats.totalPatients ?? patientCount}</p>
+                          </div>
+                          <div className="p-3 rounded-xl border border-gray-200 bg-gray-50/80">
+                            <p className="text-gray-500">Medecins</p>
+                            <p className="font-semibold text-gray-700">{stats.totalMedecins ?? medecinCount}</p>
+                          </div>
+                          <div className="p-3 rounded-xl border border-gray-200 bg-gray-50/80">
+                            <p className="text-gray-500">Rendez-vous</p>
+                            <p className="font-semibold text-gray-700">{stats.totalAppointments ?? rendezVous.length}</p>
+                          </div>
+                        </div>
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                         <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 p-4 sm:p-6">
                           <h4 className="text-base sm:text-lg font-semibold text-gray-700 mb-4 text-center">RÃ©partition des rÃ´les</h4>
@@ -1262,6 +1215,10 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+
+
+
 
 
 

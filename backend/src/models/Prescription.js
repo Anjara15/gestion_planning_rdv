@@ -10,7 +10,7 @@ const Prescription = sequelize.define('Prescription', {
   },
   consultation_id: {
     type: DataTypes.STRING(50),
-    allowNull: false,
+    allowNull: true,
     references: {
       model: 'consultations',
       key: 'id',

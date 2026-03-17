@@ -5,11 +5,17 @@ const { Op } = require('sequelize');
 
 exports.getAppointments = async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, type, type_consultation } = req.query;
     const where = {};
     if (req.user.role === 'medecin') {
       where.medecin_id = req.user.id;
     }
+
+    const typeValue = type_consultation || type;
+    if (typeValue) {
+      where.type_consultation = typeValue;
+    }
+
     // Support archive/past query: return appointments with date less than today
     if (req.query.past === 'true' || req.query.archive === 'true') {
       const today = new Date();
@@ -36,20 +42,33 @@ exports.getAppointments = async (req, res) => {
 exports.createAppointment = async (req, res) => {
   try {
     // BUG FIX: Remplacement de 'heure' par 'time' pour correspondre au modèle.
-    const { patient_id, date, time, specialite, demande, is_new } = req.body;
+    const { patient_id, date, time, specialite, demande, is_new, medecin_id, type_consultation, severity } = req.body;
     const patient = await User.findByPk(patient_id);
     if (!patient || patient.role !== 'patient') {
       return res.status(404).json({ error: 'Patient non trouvé' });
     }
+
+    let targetMedecinId = null;
+    if (req.user.role === 'medecin') {
+      targetMedecinId = req.user.id;
+    } else if (medecin_id) {
+      targetMedecinId = medecin_id;
+    }
+
+    const resolvedSpecialite =
+      specialite || (type_consultation === 'urgence' ? 'Urgence' : 'Consultation');
+
     const appointment = await Appointment.create({
       id: `rdv_${Date.now()}`,
       patient_id,
       date,
       time, // BUG FIX: Utilisation de 'time'
-      specialite,
-      medecin_id: req.user.id,
+      specialite: resolvedSpecialite,
+      medecin_id: targetMedecinId,
       demande,
       is_new,
+      type_consultation: type_consultation || 'consultation',
+      severity: severity || null,
     });
     res.status(201).json(appointment);
   } catch (err) {
@@ -62,22 +81,35 @@ exports.updateAppointment = async (req, res) => {
   try {
     const { id } = req.params;
     // BUG FIX: Remplacement de 'heure' par 'time' pour correspondre au modèle.
-    const { patient_id, date, time, specialite, demande, is_new } = req.body;
+    const { patient_id, date, time, specialite, demande, is_new, medecin_id, type_consultation, severity } = req.body;
     const appointment = await Appointment.findByPk(id);
-    if (!appointment || appointment.medecin_id !== req.user.id) {
+    if (!appointment) {
+      return res.status(404).json({ error: 'Rendez-vous non trouvé' });
+    }
+    if (req.user.role === 'medecin' && appointment.medecin_id !== req.user.id) {
       return res.status(404).json({ error: 'Rendez-vous non trouvé ou non autorisé' });
     }
-    const patient = await User.findByPk(patient_id);
+    const nextPatientId = patient_id || appointment.patient_id;
+    const patient = await User.findByPk(nextPatientId);
     if (!patient || patient.role !== 'patient') {
       return res.status(404).json({ error: 'Patient non trouvé' });
     }
+
+    let nextMedecinId = appointment.medecin_id;
+    if (req.user.role !== 'medecin' && typeof medecin_id !== 'undefined') {
+      nextMedecinId = medecin_id;
+    }
+
     await appointment.update({
-      patient_id,
-      date,
-      time, // BUG FIX: Utilisation de 'time'
-      specialite,
-      demande,
-      is_new,
+      patient_id: nextPatientId,
+      date: date || appointment.date,
+      time: time || appointment.time,
+      specialite: specialite || appointment.specialite,
+      demande: typeof demande !== 'undefined' ? demande : appointment.demande,
+      is_new: typeof is_new !== 'undefined' ? is_new : appointment.is_new,
+      medecin_id: nextMedecinId,
+      type_consultation: type_consultation || appointment.type_consultation,
+      severity: typeof severity !== 'undefined' ? severity : appointment.severity,
     });
     res.json(appointment);
   } catch (err) {
@@ -172,7 +204,7 @@ exports.getAvailableSlots = async (req, res) => {
 // Patient creates an appointment from a selected slot (without doctor)
 exports.createAppointmentByPatient = async (req, res) => {
   try {
-    const { date, time, specialite, demande } = req.body;
+    const { date, time, specialite, demande, type_consultation } = req.body;
     if (!date || !time) {
       return res.status(400).json({ error: 'date et time sont requis' });
     }
@@ -186,6 +218,7 @@ exports.createAppointmentByPatient = async (req, res) => {
       medecin_id: null,
       demande,
       is_new: true,
+      type_consultation: type_consultation || 'consultation',
     });
 
     res.status(201).json(appointment);
@@ -359,13 +392,12 @@ exports.getPendingAppointments = async (req, res) => {
       prenom: a.patient?.username ? String(a.patient.username).split(' ')[1] || '' : undefined,
       email: a.patient?.email || a.email || null,
       telephone: a.patient?.telephone || null,
+      specialite: a.specialite || null,
       date: a.date,
       time: a.time,
-      specialite: a.specialite,
       demande: a.demande,
-      createdAt: a.createdAt,
+      is_new: a.is_new,
     }));
-
     res.json(result);
   } catch (err) {
     console.error('❌ Error fetching pending appointments:', err);
@@ -381,10 +413,7 @@ exports.approveAppointment = async (req, res) => {
     if (!appointment) {
       return res.status(404).json({ error: 'Rendez-vous non trouvé' });
     }
-
-    // mark as not new and keep medecin_id as is (assignment separate)
     await appointment.update({ is_new: false });
-
     res.json({ success: true, appointment });
   } catch (err) {
     console.error('❌ Error approving appointment:', err);
@@ -400,7 +429,6 @@ exports.rejectAppointment = async (req, res) => {
     if (!appointment) {
       return res.status(404).json({ error: 'Rendez-vous non trouvé' });
     }
-
     await appointment.destroy();
     res.json({ success: true });
   } catch (err) {
@@ -408,4 +436,3 @@ exports.rejectAppointment = async (req, res) => {
     res.status(500).json({ error: "Erreur serveur lors du rejet du rendez-vous" });
   }
 };
-

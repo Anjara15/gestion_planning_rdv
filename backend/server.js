@@ -12,6 +12,9 @@ require('./src/models/Consultation');
 require('./src/models/Prescription');
 require('./src/models/History');
 require('./src/models/Specialty');
+require('./src/models/Message');
+require('./src/models/Payment');
+require('./src/models/InventoryItem');
 
 // Define associations that are intentionally centralized here.
 User.hasMany(TimeSlot, { foreignKey: 'medecin_id', as: 'timeSlots' });
@@ -54,6 +57,12 @@ app.use('/api/prescriptions', require('./src/routes/prescriptionRoutes'));
 app.use('/api/stats', require('./src/routes/statsRoutes'));
 app.use('/api/history', require('./src/routes/historyRoutes'));
 app.use('/api/specialties', require('./src/routes/specialtyRoutes'));
+// messaging between medecin and patient
+app.use('/api/messages', require('./src/routes/messageRoutes'));
+// payments and billing
+app.use('/api/payments', require('./src/routes/paymentRoutes'));
+// inventory and stock
+app.use('/api/inventory-items', require('./src/routes/inventoryRoutes'));
 
 app.get('/', (req, res) => {
   res.json({ message: 'Le serveur fonctionne' });
@@ -64,17 +73,35 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Erreur serveur interne' });
 });
 
-// In development, alter keeps schema in sync without dropping existing data.
-sequelize
-  .sync({ alter: true })
-  .then(async () => {
+const withTimeout = (promise, ms, label) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      const id = setTimeout(() => {
+        clearTimeout(id);
+        reject(new Error(`${label} timeout after ${ms}ms`));
+      }, ms);
+    }),
+  ]);
+
+const startServer = async () => {
+  let dbReady = false;
+
+  try {
+    // Try DB connection, but don't crash the server if it fails.
+    await withTimeout(sequelize.authenticate(), 10000, 'DB connection');
+    await withTimeout(sequelize.sync({ alter: true }), 20000, 'DB sync');
     await ensureSchemaCompatibility();
+    dbReady = true;
     console.log('Modeles synchronises avec la base de donnees');
-    app.listen(PORT, () => {
-      console.log(`Serveur lance sur http://localhost:${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('Erreur de synchronisation des modeles:', err);
-    process.exit(1);
+  } catch (err) {
+    console.error('Demarrage sans DB:', err.message);
+    console.error("Le serveur reste actif. Corrige la DB puis relance pour la synchronisation.");
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Serveur lance sur http://localhost:${PORT} (DB: ${dbReady ? 'OK' : 'KO'})`);
   });
+};
+
+startServer();

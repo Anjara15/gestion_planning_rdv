@@ -10,8 +10,8 @@ router.get('/', authenticateToken, (req, res, next) => {
   }
   next();
 }, getAppointments);
-router.post('/', authenticateToken, authorizeRole('medecin'), createAppointment);
-router.put('/:id', authenticateToken, authorizeRole('medecin'), updateAppointment);
+router.post('/', authenticateToken, authorizeRole(['medecin', 'admin', 'staff']), createAppointment);
+router.put('/:id', authenticateToken, authorizeRole(['medecin', 'admin', 'staff']), updateAppointment);
 router.delete('/:id', authenticateToken, deleteAppointment);
 
 // Patient: mes rendez-vous et créneaux disponibles
