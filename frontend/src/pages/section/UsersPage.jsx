@@ -14,7 +14,7 @@ import { X, ArrowLeft, Users2, Search, Filter, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { toast } from "sonner";
 
-const FiltresHistory = ({ filters, onFiltersChange }) => {
+const FiltresHistory = ({ filters, onFiltersChange, resultsCount, activeFilterCount }) => {
   const handleFilterChange = (key, value) => {
     onFiltersChange({
       ...filters,
@@ -35,12 +35,15 @@ const FiltresHistory = ({ filters, onFiltersChange }) => {
   return (
     <Card className="bg-card border border-border shadow-md rounded-2xl">
       <CardContent className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold text-foreground">Filtres</h3>
+        <div className="flex flex-col gap-2 mb-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-2">
+            <Filter className="h-5 w-5 text-primary" />
+            <h3 className="text-lg font-semibold text-foreground">Filtres utilisateurs</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">Filtre rapidement par nom, e-mail, rôle ou âge minimum.</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+          <div className="xl:col-span-2">
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
               Recherche par nom
             </label>
@@ -67,19 +70,19 @@ const FiltresHistory = ({ filters, onFiltersChange }) => {
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              RÃ´le
+              Rôle
             </label>
             <Select
               value={filters.status}
               onValueChange={(value) => handleFilterChange("status", value)}
             >
               <SelectTrigger className="border-border focus:ring-2 focus:ring-primary/20">
-                <SelectValue placeholder="Tous les rÃ´les" />
+                <SelectValue placeholder="Tous les rôles" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les rÃ´les</SelectItem>
+                <SelectItem value="all">Tous les rôles</SelectItem>
                 <SelectItem value="patient">Patient</SelectItem>
-                <SelectItem value="medecin">MÃ©decin</SelectItem>
+                <SelectItem value="medecin">Médecin</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="staff">Staff</SelectItem>
               </SelectContent>
@@ -87,7 +90,7 @@ const FiltresHistory = ({ filters, onFiltersChange }) => {
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              Ã‚ge minimum
+              Âge minimum
             </label>
             <Input
               type="number"
@@ -107,8 +110,13 @@ const FiltresHistory = ({ filters, onFiltersChange }) => {
               className="w-full border-border hover:bg-primary hover:text-primary-foreground transition-colors"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
-              RÃ©initialiser
+              Réinitialiser
             </Button>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
+            {resultsCount} utilisateur{resultsCount > 1 ? "s" : ""} affiché{resultsCount > 1 ? "s" : ""} {activeFilterCount > 0 ? `• ${activeFilterCount} filtre${activeFilterCount > 1 ? "s" : ""} actif${activeFilterCount > 1 ? "s" : ""}` : "• aucun filtre actif"}
           </div>
         </div>
       </CardContent>
@@ -160,7 +168,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-          toast.error("Session expirÃ©e ou accÃ¨s refusÃ©.");
+          toast.error("Session expirée ou accès refusé.");
           return;
         }
         throw new Error("Failed to fetch users");
@@ -197,6 +205,22 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
       return true;
     });
   }, [users, filters]);
+
+  const userStats = useMemo(() => {
+    return {
+      total: filteredUsers.length,
+      patients: filteredUsers.filter((user) => user.role === "patient").length,
+      medecins: filteredUsers.filter((user) => user.role === "medecin").length,
+      adminsStaff: filteredUsers.filter((user) => user.role === "admin" || user.role === "staff").length,
+    };
+  }, [filteredUsers]);
+
+  const activeFilterCount = useMemo(
+    () =>
+      [filters.patient, filters.email, filters.ageMin].filter((value) => String(value || "").trim() !== "").length +
+      (filters.status && filters.status !== "all" ? 1 : 0),
+    [filters]
+  );
 
   // Edit user
   const startEditUser = (user) => {
@@ -241,7 +265,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-          toast.error("Session expirÃ©e. Veuillez vous reconnecter.");
+          toast.error("Session expirée. Veuillez vous reconnecter.");
           return;
         }
         const error = await response.json();
@@ -257,11 +281,11 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
       // Add to history
       await addToHistory(
-        `Utilisateur modifiÃ©: ${editingUser.username}`,
-        `Mise Ã  jour du profil de ${editingUser.username}`
+        `Utilisateur modifié: ${editingUser.username}`,
+        `Mise à jour du profil de ${editingUser.username}`
       );
 
-      toast.success(`Utilisateur "${editingUser.username}" sauvegardÃ© !`);
+      toast.success(`Utilisateur "${editingUser.username}" sauvegardé !`);
       setEditingUserId(null);
       setEditingUser({});
     } catch (error) {
@@ -272,7 +296,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
   // Delete user
   const deleteUser = async (userId, username) => {
-    if (!window.confirm(`ÃŠtes-vous sÃ»r de vouloir supprimer l'utilisateur "${username}" ?`)) {
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${username}" ?`)) {
       return;
     }
 
@@ -286,7 +310,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-          toast.error("Session expirÃ©e. Veuillez vous reconnecter.");
+          toast.error("Session expirée. Veuillez vous reconnecter.");
           return;
         }
         throw new Error("Failed to delete user");
@@ -297,11 +321,11 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
       // Add to history
       await addToHistory(
-        `Utilisateur supprimÃ©: ${username}`,
+        `Utilisateur supprimé: ${username}`,
         `Suppression du compte utilisateur ${username}`
       );
 
-      toast.success(`Utilisateur "${username}" supprimÃ© !`);
+      toast.success(`Utilisateur "${username}" supprimé !`);
     } catch (error) {
       console.error("Error deleting user:", error);
       toast.error("Erreur lors de la suppression de l'utilisateur.");
@@ -327,11 +351,11 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
       return;
     }
     if (newUser.age && (isNaN(newUser.age) || newUser.age < 0)) {
-      toast.error("L'Ã¢ge doit Ãªtre un nombre positif !");
+      toast.error("L'Âge doit être un nombre positif !");
       return;
     }
     if (newUser.role === "medecin" && !newUser.specialite.trim()) {
-      toast.error("La spÃ©cialitÃ© est requise pour un mÃ©decin !");
+      toast.error("La spécialité est requise pour un médecin !");
       return;
     }
 
@@ -354,7 +378,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-          toast.error("Session expirÃ©e. Veuillez vous reconnecter.");
+          toast.error("Session expirée. Veuillez vous reconnecter.");
           return;
         }
         const error = await response.json();
@@ -369,10 +393,10 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
       // Add to history
       await addToHistory(
         `Nouvel utilisateur: ${newUser.username}`,
-        `CrÃ©ation du compte ${newUser.username} (${newUser.role})`
+        `Création du compte ${newUser.username} (${newUser.role})`
       );
 
-      toast.success(`Utilisateur "${newUser.username}" ajoutÃ© !`);
+      toast.success(`Utilisateur "${newUser.username}" ajouté !`);
       setShowAddModal(false);
       setNewUser({ username: "", email: "", password: "", age: "", role: "patient", specialite: "" });
     } catch (error) {
@@ -401,7 +425,28 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
       {/* Filtres */}
       <section>
-        <FiltresHistory filters={filters} onFiltersChange={setFilters} />
+        <FiltresHistory
+          filters={filters}
+          onFiltersChange={setFilters}
+          resultsCount={filteredUsers.length}
+          activeFilterCount={activeFilterCount}
+        />
+      </section>
+
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {[
+          { label: "Total affiché", value: userStats.total, tone: "text-slate-700 bg-slate-100" },
+          { label: "Patients", value: userStats.patients, tone: "text-cyan-700 bg-cyan-100" },
+          { label: "Médecins", value: userStats.medecins, tone: "text-emerald-700 bg-emerald-100" },
+          { label: "Admin / Staff", value: userStats.adminsStaff, tone: "text-violet-700 bg-violet-100" },
+        ].map((item) => (
+          <Card key={item.label} className="border border-border shadow-sm rounded-2xl">
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">{item.label}</p>
+              <p className={`mt-3 inline-flex rounded-full px-3 py-1 text-2xl font-bold ${item.tone}`}>{item.value}</p>
+            </CardContent>
+          </Card>
+        ))}
       </section>
 
       {/* Tableau des utilisateurs */}
@@ -419,9 +464,9 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                   <th className="p-3 text-left font-semibold border-b">ID</th>
                   <th className="p-3 text-left font-semibold border-b">Nom</th>
                   <th className="p-3 text-left font-semibold border-b">Email</th>
-                  <th className="p-3 text-left font-semibold border-b">Ã‚ge</th>
-                  <th className="p-3 text-left font-semibold border-b">RÃ´le</th>
-                  <th className="p-3 text-left font-semibold border-b">SpÃ©cialitÃ©s</th>
+                  <th className="p-3 text-left font-semibold border-b">Âge</th>
+                  <th className="p-3 text-left font-semibold border-b">Rôle</th>
+                  <th className="p-3 text-left font-semibold border-b">Spécialités</th>
                   <th className="p-3 text-center font-semibold border-b">Actions</th>
                 </tr>
               </thead>
@@ -430,8 +475,8 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                   <tr>
                     <td colSpan={7} className="text-center py-8 text-muted-foreground">
                       {users.length === 0
-                        ? "Aucun utilisateur enregistrÃ©"
-                        : "Aucun utilisateur ne correspond aux critÃ¨res de filtrage"}
+                        ? "Aucun utilisateur enregistré"
+                        : "Aucun utilisateur ne correspond aux critères de filtrage"}
                     </td>
                   </tr>
                 ) : (
@@ -476,7 +521,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                             value={editingUser.age || ""}
                             onChange={(e) => setEditingUser({ ...editingUser, age: e.target.value })}
                             className="w-full border-border focus:ring-2 focus:ring-primary/20"
-                            aria-label="Ã‚ge"
+                            aria-label="Âge"
                           />
                         ) : (
                           user.age || "-"
@@ -493,7 +538,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="patient">Patient</SelectItem>
-                              <SelectItem value="medecin">MÃ©decin</SelectItem>
+                              <SelectItem value="medecin">Médecin</SelectItem>
                               <SelectItem value="admin">Admin</SelectItem>
                               <SelectItem value="staff">Staff</SelectItem>
                             </SelectContent>
@@ -509,9 +554,9 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                               type="text"
                               value={editingUser.specialite || ""}
                               onChange={(e) => setEditingUser({ ...editingUser, specialite: e.target.value })}
-                              placeholder="SpÃ©cialitÃ©..."
+                              placeholder="Spécialité..."
                               className="w-full border-border focus:ring-2 focus:ring-primary/20"
-                              aria-label="SpÃ©cialitÃ©"
+                              aria-label="Spécialité"
                             />
                           ) : (
                             <span className="text-muted-foreground">-</span>
@@ -592,7 +637,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
             <button
               onClick={() => setShowAddModal(false)}
               className="absolute top-4 right-4 text-muted-foreground hover:text-destructive transition-colors"
-              aria-label="Fermer la fenÃªtre d'ajout"
+              aria-label="Fermer la fenêtre d'ajout"
             >
               <X className="h-6 w-6" />
             </button>
@@ -642,20 +687,20 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-1">
-                  Ã‚ge
+                  Âge
                 </label>
                 <Input
                   type="number"
-                  placeholder="Ã‚ge"
+                  placeholder="Âge"
                   value={newUser.age}
                   onChange={(e) => setNewUser({ ...newUser, age: e.target.value })}
                   className="w-full border-border focus:ring-2 focus:ring-primary/20"
-                  aria-label="Ã‚ge"
+                  aria-label="Âge"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-1">
-                  RÃ´le
+                  Rôle
                 </label>
                 <Select
                   value={newUser.role}
@@ -666,7 +711,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="patient">Patient</SelectItem>
-                    <SelectItem value="medecin">MÃ©decin</SelectItem>
+                    <SelectItem value="medecin">Médecin</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="staff">Staff</SelectItem>
                   </SelectContent>
@@ -675,15 +720,15 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
               {newUser.role === "medecin" && (
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-1">
-                    SpÃ©cialitÃ©
+                    Spécialité
                   </label>
                   <Input
                     type="text"
-                    placeholder="SpÃ©cialitÃ© mÃ©dicale"
+                    placeholder="Spécialité médicale"
                     value={newUser.specialite}
                     onChange={(e) => setNewUser({ ...newUser, specialite: e.target.value })}
                     className="w-full border-border focus:ring-2 focus:ring-primary/20"
-                    aria-label="SpÃ©cialitÃ©"
+                    aria-label="Spécialité"
                   />
                 </div>
               )}

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, Component } from "react";
+﻿import { useEffect, useState, useCallback, useMemo, Component } from "react";
 import { toast } from "sonner";
 import { Users2, CalendarCheck, X, Clock, User, Calendar, FileText, Settings, Plus, Edit, Trash2, Menu, X as XIcon, LogOut, BarChart3, Home, AlertTriangle, MessageSquare, FilePlus2, CreditCard, History, Pill } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line, PieChart, Pie, Cell } from "recharts";
@@ -255,7 +255,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
 
       // Fetch time slots
       const slotsResponse = await axiosInstance.get("/time-slots");
-      // Backend returns { items, total, ... } â€” map the items array (fallback to empty array)
+      // Backend returns { items, total, ... } - map the items array (fallback to empty array) map the items array (fallback to empty array)
       setCreneaux(((slotsResponse.data && slotsResponse.data.items) || []).map(mapSlotApiToUi));
     } catch (error) {
       console.error("[loadAppointmentsAndAlerts] Error loading data:", error);
@@ -282,7 +282,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
   const navigateTo = (view) => {
     setSecondaryView(view);
     setIsSidebarOpen(false);
-    addToHistory?.("Navigation", `AccÃ¨s Ã  la vue ${view}`, currentUser);
+    addToHistory?.("Navigation", `AccÃ¨s ? la vue ${view}`, currentUser);
   };
 
   const handleProfilChange = (field, value) => {
@@ -459,7 +459,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
       });
 
       await loadAppointmentsAndAlerts();
-      toast.success(`Rendez-vous reportÃ© pour ${rdv.username} â†’ ${newDate} ${newTime}`);
+      toast.success(`Rendez-vous reportÃ© pour ${rdv.username} -> ${newDate} ${newTime}`);
       addToHistory?.("Action rendez-vous", `Report du rendez-vous pour ${rdv.username} Ã  ${newDate} ${newTime}`, currentUser);
     } catch (err) {
       console.error("[handlePostponeRdv] Error:", err);
@@ -474,10 +474,8 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
         { view: "accueil", icon: Home, label: "Accueil" },
         { view: "activites", icon: History, label: "Historique d'activites" },
         { view: "consultations", icon: FileText, label: "Consultations" },
-        { view: "medicaments", icon: Pill, label: "Medicaments" },
         { view: "messagerie", icon: MessageSquare, label: "Messagerie" },
         { view: "ordonnances", icon: FilePlus2, label: "Ordonnances" },
-        { view: "paiements", icon: CreditCard, label: "Paiements" },
         { view: "patients", icon: Users2, label: "Patients" },
         { view: "planning", icon: Calendar, label: "Planning" },
         { view: "rdv", icon: CalendarCheck, label: "RDV du jour" },
@@ -530,6 +528,15 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
       .filter((c) => new Date(c.date) >= new Date())
       .sort((a, b) => new Date(a.date) - new Date(b.date))
       .slice(0, 3);
+    const appointmentsByMonth = Array.isArray(stats?.appointmentsByMonth) ? stats.appointmentsByMonth : [];
+    const consultationsByMonth = Array.isArray(stats?.consultationsByMonth) ? stats?.consultationsByMonth : [];
+    const totalConsultations = consultationsByMonth.reduce((acc, item) => acc + Number(item.count || 0), 0);
+    const accueilStatCards = [
+      { title: "Patients suivis", value: Number(stats?.totalPatients ?? patients.length ?? 0), hint: "Base active de patients", gradient: "from-cyan-500 to-blue-600" },
+      { title: "RDV planifiés", value: Number(stats?.totalAppointments ?? appointmentsByMonth.reduce((acc, item) => acc + Number(item.count || 0), 0)), hint: "Volume global de rendez-vous", gradient: "from-emerald-500 to-teal-600" },
+      { title: "Consultations", value: totalConsultations, hint: "Consultations enregistrées", gradient: "from-amber-500 to-orange-600" },
+      { title: "Urgences", value: urgences.length, hint: "Situations à surveiller", gradient: "from-rose-500 to-red-600" },
+    ];
 
     return (
       <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 mt-8 w-full">
@@ -540,34 +547,39 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
           </h3>
         </div>
         <div className="p-4 sm:p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { icon: Users2, title: "Patients", count: patients.length, description: "Total des patients enregistrÃ©s", action: "patients", actionText: "Voir tous les patients", gradient: "from-cyan-100 to-blue-100" },
-              { icon: CalendarCheck, title: "Rendez-vous du jour", count: rdvDuJour.length, description: "RDV prÃ©vus aujourd'hui", action: "rdv", actionText: "Voir les RDV", gradient: "from-emerald-100 to-teal-100" },
-              { icon: AlertTriangle, title: "Urgences", count: urgences.length, description: "Urgences Ã  traiter aujourd'hui", action: "urgences", actionText: "Voir les urgences", gradient: "from-red-100 to-pink-100" },
-              { icon: Calendar, title: "CrÃ©neaux Ã  venir", count: upcomingCreneaux.length, description: "CrÃ©neaux planifiÃ©s", action: "planning", actionText: "GÃ©rer les crÃ©neaux", gradient: "from-purple-100 to-indigo-100" },
-            // eslint-disable-next-line no-unused-vars
-            ].map(({ icon: Icon, title, count, description, action, actionText, gradient }) => (
-              <div key={title} className={`bg-gradient-to-r ${gradient} p-4 rounded-xl shadow-md`}>
-                <h4 className="text-base font-medium text-gray-700 flex items-center gap-2">
-                  <Icon className="w-5 h-5" />
-                  {title}
-                </h4>
-                <p className="text-2xl font-bold text-gray-800 mt-2">{count}</p>
-                <p className="text-sm text-gray-500 mt-1">{description}</p>
-                <Button
-                  variant="ghost"
-                  className={`mt-4 text-${gradient.split('-')[1]}-600 hover:text-${gradient.split('-')[1]}-800 hover:bg-${gradient.split('-')[1]}-50 text-sm touch-manipulation`}
-                  onClick={() => navigateTo(action)}
-                >
-                  {actionText}
-                </Button>
+          <div className="mb-8 rounded-2xl border border-cyan-100 bg-gradient-to-r from-cyan-50 via-white to-emerald-50 p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-600">Introduction rapide</p>
+                <h4 className="mt-2 text-2xl font-bold text-gray-800">Statistiques clés du cabinet</h4>
+                <p className="mt-2 text-sm text-gray-500">Vue immédiate de l'activité médicale avant d'entrer dans les autres modules.</p>
               </div>
-            ))}
+              <Button
+                variant="outline"
+                className="rounded-xl border-cyan-200 text-cyan-700 hover:bg-cyan-50"
+                onClick={() => navigateTo("stats")}
+              >
+                Ouvrir les statistiques détaillées
+              </Button>
+            </div>
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              {accueilStatCards.map((item) => (
+                <div key={item.title} className="rounded-2xl border border-white/60 bg-white/90 p-4 shadow-sm">
+                  <div className={`inline-flex rounded-full bg-gradient-to-r px-3 py-1 text-xs font-semibold text-white ${item.gradient}`}>
+                    {item.title}
+                  </div>
+                  <p className="mt-4 text-3xl font-bold text-gray-800">{item.value}</p>
+                  <p className="mt-2 text-sm text-gray-500">{item.hint}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-xs text-gray-500">
+              Dernière synchronisation: {lastStatsRefresh ? new Date(lastStatsRefresh).toLocaleTimeString("fr-FR") : "--:--:--"}
+            </p>
           </div>
           {upcomingCreneaux.length > 0 && (
-            <div className="mt-6">
-              <h4 className="text-base font-medium text-gray-700 mb-4">Prochains crÃ©neaux</h4>
+            <div className="mt-2">
+              <h4 className="text-base font-medium text-gray-700 mb-4">Prochains créneaux</h4>
               <div className="space-y-4">
                 {upcomingCreneaux.map((c) => (
                   <div
@@ -576,7 +588,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
                   >
                     <div className="mb-2 sm:mb-0">
                       <p className="text-sm font-medium text-gray-700">
-                        {c.date} â€¢ {c.heureDebut} - {c.heureFin}
+                        {c.date} • {c.heureDebut} - {c.heureFin}
                       </p>
                       <p className="text-sm text-gray-500">
                         {c.typeConsultation} - {c.salleConsultation}
@@ -856,7 +868,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
           <div className="mt-4">
             <input
               type="text"
-              placeholder="Rechercher un patient par nom, email ou téléphone"
+              placeholder="Rechercher un patient par nom, email ou tÃ©lÃ©phone"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl px-4 py-3 border border-gray-200 focus:ring-4 focus:ring-blue-500/50 focus:outline-none transition-all text-sm touch-manipulation"
@@ -873,7 +885,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
                   <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700">Nom du patient</th>
                   <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700 hidden md:table-cell">Ã‚ge</th>
                   <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700 hidden lg:table-cell">Email</th>
-                  <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700 hidden xl:table-cell">Téléphone</th>
+                  <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700 hidden xl:table-cell">TÃ©lÃ©phone</th>
                   <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700">Actions</th>
                 </tr>
               </thead>
@@ -1202,7 +1214,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">TÃ©lÃ©phone</label>
                 <input
                   type="tel"
                   value={profilData.telephone}
@@ -1457,9 +1469,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
             {secondaryView === "planning" && renderPlanningPage()}
             {secondaryView === "creneauForm" && renderCreneauForm()}
             {secondaryView === "consultations" && renderConsultationsPage()}
-            {secondaryView === "medicaments" && renderMedicamentsPage()}
             {secondaryView === "ordonnances" && renderOrdonnancesPage()}
-            {secondaryView === "paiements" && renderPaiementsPage()}
             {secondaryView === "activites" && renderActivitesPage()}
             {secondaryView === "messagerie" && renderMessageriePage()}
             {secondaryView === "profil" && renderProfilPage()}
@@ -1500,4 +1510,5 @@ MedecinDashboard.propTypes = {
 };
 
 export default MedecinDashboard;
+
 

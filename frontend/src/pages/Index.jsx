@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { Stethoscope, LogIn, Info } from "lucide-react";
 import HeroImage from "../assets/images/HeroImage.jpg";
 
 const Index = () => {
@@ -32,11 +31,6 @@ const Index = () => {
                 </button>
               </Link>
 
-              <Link to="/about" className="w-full sm:w-48">
-                <button className="group flex items-center justify-center w-full px-6 py-4 rounded-xl text-lg font-semibold text-gray-900 bg-white/80 backdrop-blur-md border border-gray-200 shadow-lg hover:bg-gray-50 transform hover:scale-105 transition-all duration-300">
-                  En savoir plus
-                </button>
-              </Link>
             </div>
           </div>
 

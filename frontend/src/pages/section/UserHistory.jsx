@@ -81,10 +81,10 @@ const FiltresHistory = ({ filters, onFiltersChange }) => {
             />
           </div>
 
-          {/* PÃƒÂ©riode */}
+          {/* PÃ©riode */}
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              PÃƒÂ©riode
+              PÃ©riode
             </label>
             <Select
               value={filters.dateRange}
@@ -94,20 +94,20 @@ const FiltresHistory = ({ filters, onFiltersChange }) => {
                 <SelectValue placeholder="Toutes les dates" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Toutes les pÃƒÂ©riodes</SelectItem>
+                <SelectItem value="all">Toutes les pÃ©riodes</SelectItem>
                 <SelectItem value="today">Aujourd'hui</SelectItem>
                 <SelectItem value="week">Cette semaine</SelectItem>
                 <SelectItem value="month">Ce mois</SelectItem>
                 <SelectItem value="quarter">Ce trimestre</SelectItem>
-                <SelectItem value="year">Cette annÃƒÂ©e</SelectItem>
+                <SelectItem value="year">Cette annÃ©e</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Date spÃƒÂ©cifique */}
+          {/* Date spÃ©cifique */}
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              Date spÃƒÂ©cifique
+              Date spÃ©cifique
             </label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -170,7 +170,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
           localStorage.removeItem("token");
-          toast.error("Session expirÃƒÂ©e. Veuillez vous reconnecter.");
+          toast.error("Session expirée. Veuillez vous reconnecter.");
           return;
         }
         throw new Error("Failed to fetch history");
@@ -180,8 +180,8 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
       setHistory(data.history || []);
     } catch (error) {
       console.error("Error fetching history:", error);
-      setError("Erreur lors de la rÃƒÂ©cupÃƒÂ©ration de l'historique.");
-      toast.error("Erreur lors de la rÃƒÂ©cupÃƒÂ©ration de l'historique.");
+      setError("Erreur lors de la récupération de l'historique.");
+      toast.error("Erreur lors de la récupération de l'historique.");
     } finally {
       setLoading(false);
     }
@@ -265,7 +265,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
         }
       }
 
-      // Filtre par date spÃƒÂ©cifique
+      // Filtre par date spÃ©cifique
       if (filters.dateSpecific && filters.dateSpecific.trim()) {
         const entryDate = new Date(entry.createdAt).toISOString().split('T')[0];
         if (entryDate !== filters.dateSpecific) {
@@ -273,7 +273,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
         }
       }
 
-      // Filtre par pÃƒÂ©riode (dÃƒÂ©jÃƒÂ  appliquÃƒÂ© cÃƒÂ´tÃƒÂ© serveur, mais on peut filtrer cÃƒÂ´tÃƒÂ© client pour dateSpecific)
+      // Filtre par p?riode (déjà appliqué côté serveur, mais on peut filtrer côté client pour dateSpecific)
       if (filters.dateRange && filters.dateRange !== "all") {
         if (!isDateInRange(entry.createdAt, filters.dateRange)) {
           return false;
@@ -315,7 +315,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
         </div>
       </div>
 
-      {/* Tableau stylÃƒÂ© */}
+      {/* Tableau stylÃ© */}
       <section>
         <div className="bg-card rounded-2xl shadow-md border border-border p-6 overflow-auto">
           {loading ? (
@@ -371,8 +371,8 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                       className="text-center py-8 text-muted-foreground"
                     >
                       {history.length === 0
-                        ? "Aucune entrÃƒÂ©e d'historique trouvÃƒÂ©e"
-                        : "Aucune entrÃƒÂ©e ne correspond aux critÃƒÂ¨res de filtrage"
+                        ? "Aucune entrÃ©e d'historique trouvée"
+                        : "Aucune entrÃ©e ne correspond aux critÃ¨res de filtrage"
                       }
                     </td>
                   </tr>

@@ -8,14 +8,13 @@ import RdvPage from "./section/RdvPage";
 import TimeSlotsAdmin from "./section/TimeSlotsAdmin";
 import AdminInventoryStock from "./section/AdminInventoryStock";
 import AdminAuditLog from "./section/AdminAuditLog";
-import AdminBillingPayments from "./section/AdminBillingPayments";
 import AdminConfiguration from "./section/AdminConfiguration";
 import AdminArchive from "./section/AdminArchive";
 import AdminAIAssistant from "./section/AdminAIAssistant";
 import AdminEmergency from "./section/AdminEmergency";
 import AdminMedicalRecords from "./section/AdminMedicalRecords";
 
-import { Users2, CalendarCheck, X, Bell, History, Plus, UserCheck, Stethoscope, Search, Menu, BarChart3, LogOut, User, AlertTriangle, FileText, Archive, Package, CreditCard, Settings2, Bot } from "lucide-react";
+import { Users2, CalendarCheck, X, Bell, History, Plus, UserCheck, Stethoscope, Search, Menu, BarChart3, LogOut, User, AlertTriangle, FileText, Archive, Package, Settings2, Bot } from "lucide-react";
 import Swal from 'sweetalert2';
 import axios from "axios";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -112,7 +111,7 @@ const Dashboard = () => {
         });
       } catch (err) {
         console.error("Error fetching user:", err);
-        sonnerToast.error("Erreur lors de la rÃ©cupÃ©ration du profil utilisateur.");
+        sonnerToast.error("Erreur lors de la récupération du profil utilisateur.");
         navigate("/");
       }
     };
@@ -124,7 +123,7 @@ const Dashboard = () => {
           setUsers(response.data);
         } catch (err) {
           console.error("Error fetching users:", err);
-          sonnerToast.error("Erreur lors de la rÃ©cupÃ©ration des utilisateurs." );
+          sonnerToast.error("Erreur lors de la récupération des utilisateurs." );
         }
       }
     };
@@ -140,7 +139,7 @@ const Dashboard = () => {
             .filter((user) => user.isNew)
             .map((user) => ({
               id: `user-${user.id}`,
-              message: `Nouvel utilisateur ajoutÃ©: ${user.username} (${user.role})`,
+              message: `Nouvel utilisateur ajouté: ${user.username} (${user.role})`,
             }));
           const newRdvAlerts = appointmentsResponse.data
             .filter((rdv) => rdv.isNew)
@@ -152,7 +151,7 @@ const Dashboard = () => {
         }
       } catch (err) {
         console.error("Error fetching alerts:", err);
-        sonnerToast.error("Erreur lors de la rÃ©cupÃ©ration des alertes." );
+        sonnerToast.error("Erreur lors de la récupération des alertes." );
       }
     };
 
@@ -170,7 +169,7 @@ const Dashboard = () => {
           setRendezVous(response.data);
         } catch (err) {
           console.error("Error fetching appointments:", err);
-          sonnerToast.error("Erreur lors de la rÃ©cupÃ©ration des rendez-vous." );
+          sonnerToast.error("Erreur lors de la récupération des rendez-vous." );
         }
       };
       fetchAppointments();
@@ -187,7 +186,7 @@ const Dashboard = () => {
           const total = response.data.total || items.length;
           setTimeSlots(Array.isArray(items) ? items : []);
           setTimeSlotsTotal(total);
-          console.log("âœ… Time slots loaded:", items.length, "/ Total:", total);
+          console.log("Time slots loaded:", items.length, "/ Total:", total);
         } catch (err) {
           console.error("Error fetching time slots:", err);
         }
@@ -208,7 +207,7 @@ const Dashboard = () => {
 
     const userRoleData = [
       { name: 'Patients', value: calculatedStats.totalPatients, fill: '#3b82f6' },
-      { name: 'MÃ©decins', value: calculatedStats.totalMedecins, fill: '#10b981' },
+      { name: 'Médecins', value: calculatedStats.totalMedecins, fill: '#10b981' },
     ];
 
     const appointmentMap = rendezVous.reduce((acc, rdv) => {
@@ -235,7 +234,7 @@ const Dashboard = () => {
     const historyEntry = {
       id: Date.now(),
       timestamp: new Date().toISOString(),
-      user: user?.username || "SystÃ¨me",
+      user: user?.username || "Système",
       role: user?.role || "system",
       action,
       details,
@@ -266,15 +265,15 @@ const Dashboard = () => {
   // Handle user logout
   const logout = async () => {
     try {
-      await addToHistory("DÃ©connexion", "DÃ©connexion de l'application");
+      await addToHistory("Déconnexion", "Déconnexion de l'application");
       localStorage.removeItem("token");
       localStorage.removeItem("role");
       setCurrentUser(null);
       navigate("/");
-      sonnerToast.success("DÃ©connexion rÃ©ussie" );
+      sonnerToast.success("Déconnexion réussie" );
     } catch (err) {
       console.error("Error during logout:", err);
-      sonnerToast.error("Erreur lors de la dÃ©connexion." );
+      sonnerToast.error("Erreur lors de la déconnexion." );
     }
   };
 
@@ -291,9 +290,9 @@ const Dashboard = () => {
     try {
       await api.put("/auth/me", profilData);
       setCurrentUser((prev) => ({ ...prev, ...profilData }));
-      addToHistory("Mise Ã  jour profil", "Sauvegarde des modifications du profil", currentUser);
+      addToHistory("Mise à jour profil", "Sauvegarde des modifications du profil", currentUser);
       setActiveView("users");
-      sonnerToast.success("Profil mis Ã  jour", { description: "Les informations du profil ont Ã©tÃ© sauvegardÃ©es." });
+      sonnerToast.success("Profil mis à jour", { description: "Les informations du profil ont été sauvegardées." });
     } catch (error) {
       console.error("Error saving profile:", error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || "Erreur inconnue";
@@ -467,7 +466,7 @@ const Dashboard = () => {
       const updatedRdv = rendezVous.map((rdv) => ({ ...rdv, isNew: false }));
       setUsers(updatedUsers);
       setRendezVous(updatedRdv);
-      await addToHistory("Suppression alertes", "Toutes les alertes ont Ã©tÃ© supprimÃ©es");
+      await addToHistory("Suppression alertes", "Toutes les alertes ont été supprimées");
     } catch (err) {
       console.error("Error clearing all alerts:", err);
       sonnerToast.error("Erreur lors de la suppression des alertes." );
@@ -493,7 +492,7 @@ const Dashboard = () => {
       setRendezVous(response.data);
     } catch (err) {
       console.error("Error fetching archive appointments:", err);
-      sonnerToast.error("Erreur lors de la rÃ©cupÃ©ration de l'archive des rendez-vous." );
+      sonnerToast.error("Erreur lors de la récupération de l'archive des rendez-vous." );
     }
   };
 
@@ -627,7 +626,7 @@ const Dashboard = () => {
             variant="ghost"
             className="p-2 rounded-full text-gray-700 hover:bg-gradient-to-r hover:from-red-500 hover:to-pink-600 hover:text-white transition-all duration-200"
             onClick={logout}
-            title="DÃ©connexion"
+            title="Déconnexion"
           >
             <LogOut className="w-5 h-5 sm:w-6 sm:h-6" />
           </Button>
@@ -727,7 +726,6 @@ const Dashboard = () => {
               { view: "configuration", icon: Settings2, label: "Configuration" },
               { view: "timeslots", icon: CalendarCheck, label: "Creneaux admin" },
               { view: "medical-records", icon: FileText, label: "Dossiers medicaux" },
-              { view: "billing", icon: CreditCard, label: "Facturation et paiement" },
               { view: "inventory-stock", icon: Package, label: "Inventaire et stock" },
               { view: "audit-log", icon: History, label: "Journal d'audit" },
               { view: "appointments", icon: CalendarCheck, label: "Rendez-vous" },
@@ -892,17 +890,17 @@ const Dashboard = () => {
                   <button
                     onClick={() => setShowPatientModal(false)}
                     className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-full p-2 transition-colors duration-200"
-                    aria-label="Fermer les dÃ©tails du patient"
+                    aria-label="Fermer les détails du patient"
                   >
                     <X className="w-6 h-6" />
                   </button>
                   <div className="text-center mb-6">
                     <User className="w-14 h-14 text-blue-600 mx-auto mb-4" />
                     <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                      DÃ©tails du Patient
+                      Détails du Patient
                     </h3>
                     <p className="text-gray-600 text-sm">
-                      Informations complÃ¨tes du patient sÃ©lectionnÃ©
+                      Informations complètes du patient sélectionné
                     </p>
                   </div>
                   <div className="space-y-4">
@@ -920,15 +918,15 @@ const Dashboard = () => {
                         <p className="text-gray-900 bg-gray-50 p-3 rounded-xl">{selectedPatient.telephone || 'N/A'}</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Ã‚ge</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Âge</label>
                         <p className="text-gray-900 bg-gray-50 p-3 rounded-xl">{selectedPatient.age ? `${selectedPatient.age} ans` : 'Inconnu'}</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">RÃ´le</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Rôle</label>
                         <p className="text-gray-900 bg-gray-50 p-3 rounded-xl capitalize">{selectedPatient.role || 'N/A'}</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">SpÃ©cialitÃ©</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Spécialité</label>
                         <p className="text-gray-900 bg-gray-50 p-3 rounded-xl">{selectedPatient.specialite || 'N/A'}</p>
                       </div>
                     </div>
@@ -962,7 +960,6 @@ const Dashboard = () => {
                   <div className="flex justify-between items-center mb-4 sm:mb-6">
                     <div>
                       <h3 className="text-xl sm:text-2xl font-semibold text-gray-700">Gestion des utilisateurs</h3>
-                      <p className="text-xs sm:text-sm text-gray-500 mt-1">Vue amelioree: filtres rapides, recherche et actions directes.</p>
                     </div>
                     <Button
                       onClick={() => setShowAddModal(true)}
@@ -978,26 +975,7 @@ const Dashboard = () => {
                     <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium">Medecins: {medecinCount}</span>
                     <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">Affiches: {displayUsers.length}</span>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
-                    <Button
-                      onClick={() => setActiveUserTab("all")}
-                      className={`flex-1 py-2 px-3 sm:px-4 rounded-xl font-medium transition-all duration-300 text-xs sm:text-sm ${activeUserTab === "all" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-sm" : "text-gray-700 hover:bg-gradient-to-r hover:from-cyan-600 hover:to-blue-700 hover:text-white"}`}
-                    >
-                      Tous
-                    </Button>
-                    <Button
-                      onClick={() => setActiveUserTab("patient")}
-                      className={`flex-1 py-2 px-3 sm:px-4 rounded-xl font-medium transition-all duration-300 text-xs sm:text-sm ${activeUserTab === "patient" ? "bg-gradient-to-r from-blue-500 to-cyan-600 text-white shadow-sm" : "text-gray-700 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-700 hover:text-white"}`}
-                    >
-                      Patients
-                    </Button>
-                    <Button
-                      onClick={() => setActiveUserTab("medecin")}
-                      className={`flex-1 py-2 px-3 sm:px-4 rounded-xl font-medium transition-all duration-300 text-xs sm:text-sm ${activeUserTab === "medecin" ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-sm" : "text-gray-700 hover:bg-gradient-to-r hover:from-emerald-600 hover:to-teal-700 hover:text-white"}`}
-                    >
-                      MÃ©decins
-                    </Button>
-                  </div>
+                  
                   <div className="mb-4">
                     <div className="relative">
                       <Search className="absolute left-3 sm:left-5 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
@@ -1006,7 +984,7 @@ const Dashboard = () => {
                         value={userSearchQuery}
                         onChange={(e) => setUserSearchQuery(e.target.value)}
                         className="w-full rounded-xl px-10 sm:px-12 py-2 sm:py-4 border border-gray-200 focus:ring-4 focus:ring-blue-500/50 focus:outline-none transition-all text-xs sm:text-sm"
-                        placeholder="Rechercher par nom, email ou spÃ©cialitÃ©..."
+                        placeholder="Rechercher par nom, email ou spécialité..."
                       />
                     </div>
                   </div>
@@ -1014,7 +992,7 @@ const Dashboard = () => {
                     <div className="text-center py-8 sm:py-12">
                       <Users2 className="w-12 h-12 sm:w-16 sm:h-16 text-gray-500 mx-auto mb-4" />
                       <h4 className="text-base sm:text-lg font-medium text-gray-500 mb-2">Aucun utilisateur</h4>
-                      <p className="text-xs sm:text-sm text-gray-500 mb-4">Commencez par ajouter des patients ou des mÃ©decins.</p>
+                      <p className="text-xs sm:text-sm text-gray-500 mb-4">Commencez par ajouter des patients ou des médecins.</p>
                       <Button
                         onClick={() => setShowAddModal(true)}
                         className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl text-xs sm:text-sm"
@@ -1029,7 +1007,7 @@ const Dashboard = () => {
                         <thead className="bg-gray-50/80">
                           <tr>
                             <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700">Nom utilisateur</th>
-                            <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700 hidden md:table-cell">Ã‚ge</th>
+                            <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700 hidden md:table-cell">Âge</th>
                             <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700 hidden lg:table-cell">Email</th>
                             <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700 hidden xl:table-cell">Téléphone</th>
                             <th className="border border-white/30 p-2 text-left text-sm font-medium text-gray-700">Actions</th>
@@ -1083,7 +1061,7 @@ const Dashboard = () => {
                   <div className="flex justify-between items-center mb-6">
                     <div>
                       <h3 className="text-xl sm:text-2xl font-semibold text-gray-700">Tous les rendez-vous</h3>
-                      <p className="text-xs sm:text-sm text-gray-500 mt-1">Interface amelioree pour la gestion centralisee des RDV.</p>
+                      {/* <p className="text-xs sm:text-sm text-gray-500 mt-1">Interface amelioree pour la gestion centralisee des RDV.</p> */}
                     </div>
                     <Button
                       variant="outline"
@@ -1093,10 +1071,7 @@ const Dashboard = () => {
                       Voir archives
                     </Button>
                   </div>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-medium">Total RDV: {rendezVous.length}</span>
-                    <span className="px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-medium">Vue admin en temps reel</span>
-                  </div>
+                  
                   <RdvPage rendezVous={rendezVous} setRendezVous={setRendezVous} addToHistory={addToHistory} />
                 </div>
               )}
@@ -1108,9 +1083,6 @@ const Dashboard = () => {
               )}
               {activeView === "audit-log" && (
                 <AdminAuditLog api={api} />
-              )}
-              {activeView === "billing" && (
-                <AdminBillingPayments addToHistory={addToHistory} currentUser={currentUser} />
               )}
               {activeView === "configuration" && (
                 <AdminConfiguration addToHistory={addToHistory} currentUser={currentUser} />
@@ -1164,7 +1136,7 @@ const Dashboard = () => {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                         <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 p-4 sm:p-6">
-                          <h4 className="text-base sm:text-lg font-semibold text-gray-700 mb-4 text-center">RÃ©partition des rÃ´les</h4>
+                          <h4 className="text-base sm:text-lg font-semibold text-gray-700 mb-4 text-center">Répartition des rôles</h4>
                           <ChartContainer
                             config={{
                               Patients: { label: "Patients", color: "#3b82f6" },
@@ -1190,7 +1162,7 @@ const Dashboard = () => {
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <p className="text-gray-500 text-xs sm:text-sm">Aucune donnÃ©e disponible pour les statistiques.</p>
+                      <p className="text-gray-500 text-xs sm:text-sm">Aucune donnée disponible pour les statistiques.</p>
                     </div>
                   )}
                 </div>

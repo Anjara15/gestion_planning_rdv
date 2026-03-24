@@ -67,7 +67,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-          toast.error("Session expirÃ©e. Veuillez vous reconnecter.");
+          toast.error("Session expirée. Veuillez vous reconnecter.");
           return;
         }
         throw new Error("Failed to fetch pending appointments");
@@ -77,7 +77,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
       setPendingAppointments(appointments);
     } catch (error) {
       console.error("Error fetching pending appointments:", error);
-      toast.error("Erreur lors de la rÃ©cupÃ©ration des rendez-vous en attente.");
+      toast.error("Erreur lors de la récupération des rendez-vous en attente.");
     } finally {
       setLoading(false);
     }
@@ -167,7 +167,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-          toast.error("Session expirÃ©e. Veuillez vous reconnecter.");
+          toast.error("Session expirée. Veuillez vous reconnecter.");
           return;
         }
         throw new Error(`Failed to ${approvalAction} appointment`);
@@ -182,12 +182,12 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
       // Add to history
       await addToHistory(
-        `Rendez-vous ${approvalAction === "approve" ? "approuvÃ©" : "rejetÃ©"}`,
-        `${approvalAction === "approve" ? "Approbation" : "Rejet"} du rendez-vous de ${selectedAppointment.nom} ${selectedAppointment.prenom} pour le ${selectedAppointment.date} Ã  ${selectedAppointment.time}`
+        `Rendez-vous ${approvalAction === "approve" ? "approuvé" : "rejeté"}`,
+        `${approvalAction === "approve" ? "Approbation" : "Rejet"} du rendez-vous de ${selectedAppointment.nom} ${selectedAppointment.prenom} pour le ${selectedAppointment.date} �  ${selectedAppointment.time}`
       );
 
       toast.success(
-        `Rendez-vous ${approvalAction === "approve" ? "approuvÃ©" : "rejetÃ©"} avec succÃ¨s`,
+        `Rendez-vous ${approvalAction === "approve" ? "approuvé" : "rejeté"} avec succès`,
         {
           description: `${selectedAppointment.nom} ${selectedAppointment.prenom} - ${selectedAppointment.specialite}`,
         }
@@ -232,7 +232,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
           Approbation des rendez-vous
         </h1>
         <p className="text-gray-600 max-w-2xl mx-auto">
-          GÃ©rez les demandes de rendez-vous en attente d'approbation. Approuvez ou rejetez les demandes selon les disponibilitÃ©s et les critÃ¨res mÃ©dicaux.
+          Gérez les demandes de rendez-vous en attente d'approbation. Approuvez ou rejetez les demandes selon les disponibilités et les critères médicaux.
         </p>
       </section>
 
@@ -251,7 +251,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
             <h3 className="text-2xl font-bold text-green-800">
               {pendingAppointments.filter(apt => apt.status === "approved").length}
             </h3>
-            <p className="text-green-600">ApprouvÃ©s aujourd'hui</p>
+            <p className="text-green-600">Approuvés aujourd'hui</p>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-r from-red-50 to-red-100 border-red-200">
@@ -260,7 +260,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
             <h3 className="text-2xl font-bold text-red-800">
               {pendingAppointments.filter(apt => apt.status === "rejected").length}
             </h3>
-            <p className="text-red-600">RejetÃ©s aujourd'hui</p>
+            <p className="text-red-600">Rejetés aujourd'hui</p>
           </CardContent>
         </Card>
       </section>
@@ -304,10 +304,10 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
               <div>
                 <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  SpÃ©cialitÃ©
+                  Spécialité
                 </label>
                 <Input
-                  placeholder="SpÃ©cialitÃ© mÃ©dicale..."
+                  placeholder="Spécialité médicale..."
                   value={filters.specialite}
                   onChange={(e) => setFilters(prev => ({ ...prev, specialite: e.target.value }))}
                   className="border-border focus:ring-2 focus:ring-primary/20"
@@ -316,7 +316,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
               <div>
                 <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  PÃ©riode
+                  Période
                 </label>
                 <Select
                   value={filters.dateRange}
@@ -342,7 +342,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                 className="border-border hover:bg-primary hover:text-primary-foreground transition-colors"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
-                RÃ©initialiser
+                Réinitialiser
               </Button>
               <Button
                 onClick={fetchPendingAppointments}
@@ -375,7 +375,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
               <div className="text-center py-12 text-muted-foreground">
                 <Clock className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                 <h4 className="text-lg font-medium mb-2">Aucun rendez-vous en attente</h4>
-                <p>Tous les rendez-vous ont Ã©tÃ© traitÃ©s ou aucun ne correspond aux critÃ¨res de filtrage.</p>
+                <p>Tous les rendez-vous ont été traités ou aucun ne correspond aux critères de filtrage.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -384,7 +384,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                     <tr>
                       <th className="p-4 text-left font-semibold border-b">Patient</th>
                       <th className="p-4 text-left font-semibold border-b">Contact</th>
-                      <th className="p-4 text-left font-semibold border-b">SpÃ©cialitÃ©</th>
+                      <th className="p-4 text-left font-semibold border-b">Spécialité</th>
                       <th className="p-4 text-left font-semibold border-b">Date & Heure</th>
                       <th className="p-4 text-left font-semibold border-b">Motif</th>
                       <th className="p-4 text-left font-semibold border-b">Actions</th>
@@ -440,7 +440,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                         </td>
                         <td className="p-4">
                           <p className="text-sm text-gray-600 max-w-xs truncate">
-                            {appointment.demande || "Aucun motif spÃ©cifiÃ©"}
+                            {appointment.demande || "Aucun motif spécifié"}
                           </p>
                         </td>
                         <td className="p-4">
@@ -502,7 +502,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                       year: "numeric",
                     })}
                   </strong>{" "}
-                  Ã  <strong>{selectedAppointment.time}</strong>
+                  ? <strong>{selectedAppointment.time}</strong>
                   {selectedAppointment.specialite && (
                     <> pour <strong>{selectedAppointment.specialite}</strong></>
                   )}
@@ -520,7 +520,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                 <textarea
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Expliquez la raison du rejet (ex: crÃ©neau indisponible, spÃ©cialitÃ© non disponible...)"
+                  placeholder="Expliquez la raison du rejet (ex: créneau indisponible, spécialité non disponible...)"
                   className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:outline-none"
                   rows={4}
                   required
@@ -537,7 +537,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
             {approvalAction === "approve" && (
               <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                 <p className="text-sm text-green-800">
-                  <strong>Action :</strong> Le rendez-vous sera confirmÃ© et le patient sera notifiÃ© par email.
+                  <strong>Action :</strong> Le rendez-vous sera confirmé et le patient sera notifié par email.
                 </p>
               </div>
             )}
@@ -545,7 +545,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
             {approvalAction === "reject" && (
               <div className="p-4 bg-red-50 rounded-lg border border-red-200">
                 <p className="text-sm text-red-800">
-                  <strong>Action :</strong> Le rendez-vous sera annulÃ© et le patient sera notifiÃ© par email avec la raison du rejet.
+                  <strong>Action :</strong> Le rendez-vous sera annulé et le patient sera notifié par email avec la raison du rejet.
                 </p>
               </div>
             )}

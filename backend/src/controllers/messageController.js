@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const Message = require('../models/Message');
 
 // fetch conversation between two roles (medecin <-> patient)
@@ -10,8 +11,10 @@ exports.getMessages = async (req, res) => {
 
     const msgs = await Message.findAll({
       where: {
-        fromRole,
-        toRole,
+        [Op.or]: [
+          { fromRole, toRole },
+          { fromRole: toRole, toRole: fromRole },
+        ],
       },
       order: [['createdAt', 'ASC']],
     });
@@ -24,18 +27,18 @@ exports.getMessages = async (req, res) => {
 
 exports.createMessage = async (req, res) => {
   try {
-    const { fromId, fromName, fromRole, toRole, content } = req.body;
-    if (!fromId || !fromRole || !toRole || !content) {
+    const { toRole, content } = req.body;
+    if (!toRole || !String(content || '').trim()) {
       return res.status(400).json({ error: 'Champs obligatoires manquants' });
     }
 
     const msg = await Message.create({
       id: `msg_${Date.now()}`,
-      fromId,
-      fromName,
-      fromRole,
+      fromId: String(req.user.id),
+      fromName: req.user.username || req.user.role,
+      fromRole: req.user.role,
       toRole,
-      content,
+      content: String(content).trim(),
       createdAt: new Date(),
     });
 

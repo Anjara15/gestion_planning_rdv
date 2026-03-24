@@ -79,6 +79,21 @@ const TimeSlotsAdmin = () => {
 
   const canPrev = useMemo(() => data.offset > 0, [data.offset]);
   const canNext = useMemo(() => data.offset + data.limit < data.total, [data.offset, data.limit, data.total]);
+  const slotStats = useMemo(() => {
+    const items = Array.isArray(data.items) ? data.items : [];
+    return {
+      total: data.total || items.length,
+      approved: items.filter((slot) => slot.status === "approved").length,
+      pending: items.filter((slot) => !slot.status || slot.status === "pending").length,
+      assigned: items.filter((slot) => Boolean(slot.medecin_id)).length,
+    };
+  }, [data]);
+  const activeFilterCount = useMemo(
+    () =>
+      [filters.date_from, filters.date_to, filters.type, filters.salle, filters.created_by].filter((value) => String(value || "").trim() !== "").length +
+      (filters.status && filters.status !== "all" ? 1 : 0),
+    [filters]
+  );
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -325,7 +340,7 @@ const TimeSlotsAdmin = () => {
         </div>
 
         {/* Filters Section */}
-        <Card className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/30">
+        {/* <Card className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/30">
           <CardHeader>
             <CardTitle className="text-xl">Filtres créneaux (admin)</CardTitle>
           </CardHeader>
@@ -389,7 +404,27 @@ const TimeSlotsAdmin = () => {
               </Button>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
+
+        {/* <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          {data.items.length} créneau{data.items.length > 1 ? "x" : ""} affiché{data.items.length > 1 ? "s" : ""} {activeFilterCount > 0 ? `• ${activeFilterCount} filtre${activeFilterCount > 1 ? "s" : ""} actif${activeFilterCount > 1 ? "s" : ""}` : "• aucun filtre actif"}
+        </div> */}
+
+        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {[
+            { label: "Total", value: slotStats.total, tone: "text-slate-700 bg-slate-100" },
+            { label: "Approuvés", value: slotStats.approved, tone: "text-emerald-700 bg-emerald-100" },
+            { label: "En attente", value: slotStats.pending, tone: "text-amber-700 bg-amber-100" },
+            { label: "Assignés", value: slotStats.assigned, tone: "text-cyan-700 bg-cyan-100" },
+          ].map((item) => (
+            <Card key={item.label} className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-sm border border-white/30">
+              <CardContent className="p-5">
+                <p className="text-sm text-gray-500">{item.label}</p>
+                <p className={`mt-3 inline-flex rounded-full px-3 py-1 text-2xl font-bold ${item.tone}`}>{item.value}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
 
         {/* Table Section */}
         <Card className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/30">

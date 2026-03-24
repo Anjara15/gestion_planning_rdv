@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { toast } from "sonner";
-import { FileText, Pill, Plus, Trash2, Download, Send, Search, Calendar, Edit } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Calendar, Download, Edit, FileText, Pill, Plus, Search, Send, Trash2 } from "lucide-react";
 
-const STORAGE_KEY = "medecinPrescriptions"; // legacy fallback
 const EMPTY_MEDICATION = { name: "", dosage: "", frequency: "", duration: "" };
-
-import axios from "axios";
 const _apiBaseRaw = import.meta.env.VITE_API_URL || "http://localhost:3000";
 const _apiBase = String(_apiBaseRaw).replace(/\/+$/, "");
 const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
@@ -21,25 +19,31 @@ const getTokenHeader = () => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-async function fetchPrescriptionsFromApi() {
+const fetchPrescriptionsFromApi = async () => {
   const resp = await axios.get(`${API_BASE_URL}/prescriptions`, { headers: getTokenHeader() });
   return resp.data;
-}
+};
 
-async function createPrescriptionApi(body) {
-  const resp = await axios.post(`${API_BASE_URL}/prescriptions`, body, { headers: { "Content-Type": "application/json", ...getTokenHeader() } });
+const createPrescriptionApi = async (body) => {
+  const resp = await axios.post(`${API_BASE_URL}/prescriptions`, body, {
+    headers: { "Content-Type": "application/json", ...getTokenHeader() },
+  });
   return resp.data;
-}
+};
 
-async function updatePrescriptionApi(id, body) {
-  const resp = await axios.put(`${API_BASE_URL}/prescriptions/${id}`, body, { headers: { "Content-Type": "application/json", ...getTokenHeader() } });
+const updatePrescriptionApi = async (id, body) => {
+  const resp = await axios.put(`${API_BASE_URL}/prescriptions/${id}`, body, {
+    headers: { "Content-Type": "application/json", ...getTokenHeader() },
+  });
   return resp.data;
-}
+};
 
-async function deletePrescriptionApi(id) {
-  const resp = await axios.delete(`${API_BASE_URL}/prescriptions/${id}`, { headers: getTokenHeader() });
+const deletePrescriptionApi = async (id) => {
+  const resp = await axios.delete(`${API_BASE_URL}/prescriptions/${id}`, {
+    headers: getTokenHeader(),
+  });
   return resp.data;
-}
+};
 
 const escapeHtml = (value = "") =>
   String(value)
@@ -49,6 +53,16 @@ const escapeHtml = (value = "") =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
+const normalizePrescription = (item, currentUser) => ({
+  ...item,
+  patientId: item?.patient_id || item?.patient?.id || "",
+  patientName: item?.patientName || item?.patient?.username || "Patient",
+  doctor: item?.doctor?.username || item?.doctor || currentUser?.username || "Médecin",
+  medications: Array.isArray(item?.medications) ? item.medications : [],
+  instructions: item?.instructions || "",
+  date: item?.date || new Date().toISOString().split("T")[0],
+});
+
 const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
   const [prescriptions, setPrescriptions] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -57,59 +71,49 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
   const [sendChannels, setSendChannels] = useState({});
   const [formData, setFormData] = useState({
     patientId: "",
-    patientName: "",
     date: new Date().toISOString().split("T")[0],
     medications: [{ ...EMPTY_MEDICATION }],
     instructions: "",
   });
 
-  const normalizePrescription = (item) => {
-    if (!item || typeof item !== "object") return item;
-    const patientName =
-      item.patientName ||
-      item.patient_name ||
-      item.patient?.username ||
-      item.patient?.email ||
-      "Patient";
-    const doctorName =
-      item.doctor ||
-      item.doctorName ||
-      item.doctor_name ||
-      item.doctor?.username ||
-      currentUser?.username ||
-      "MÃ©decin";
-    const medications = Array.isArray(item.medications) ? item.medications : [];
-    return { ...item, patientName, doctor: doctorName, medications };
-  };
-
   useEffect(() => {
-    // load from API
     fetchPrescriptionsFromApi()
       .then((data) => {
-        const items = Array.isArray(data) ? data : [];
-        setPrescriptions(items.map(normalizePrescription));
+        setPrescriptions(
+          Array.isArray(data) ? data.map((item) => normalizePrescription(item, currentUser)) : []
+        );
       })
       .catch((err) => {
         console.error("Erreur chargement ordonnances:", err);
         toast.error("Erreur chargement ordonnances");
       });
-  }, []);
+  }, [currentUser]);
 
   const filteredPrescriptions = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return prescriptions;
 
-    return prescriptions.filter((item) => {
-      const bag = [item.patientName, item.doctor, item.date].join(" ").toLowerCase();
-      return bag.includes(query);
-    });
+    return prescriptions.filter((item) =>
+      [item.patientName, item.doctor, item.date].join(" ").toLowerCase().includes(query)
+    );
   }, [prescriptions, searchTerm]);
+
+  const resetForm = () => {
+    setFormData({
+      patientId: "",
+      date: new Date().toISOString().split("T")[0],
+      medications: [{ ...EMPTY_MEDICATION }],
+      instructions: "",
+    });
+    setEditingPrescription(null);
+    setShowForm(false);
+  };
 
   const updateMedication = (index, field, value) => {
     setFormData((prev) => {
-      const next = [...prev.medications];
-      next[index] = { ...next[index], [field]: value };
-      return { ...prev, medications: next };
+      const medications = [...prev.medications];
+      medications[index] = { ...medications[index], [field]: value };
+      return { ...prev, medications };
     });
   };
 
@@ -123,20 +127,8 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
   const removeMedication = (index) => {
     setFormData((prev) => ({
       ...prev,
-      medications: prev.medications.filter((_, medIndex) => medIndex !== index),
+      medications: prev.medications.filter((_, medicationIndex) => medicationIndex !== index),
     }));
-  };
-
-  const resetForm = () => {
-    setFormData({
-      patientId: "",
-      patientName: "",
-      date: new Date().toISOString().split("T")[0],
-      medications: [{ ...EMPTY_MEDICATION }],
-      instructions: "",
-    });
-    setEditingPrescription(null);
-    setShowForm(false);
   };
 
   const savePrescription = async () => {
@@ -145,55 +137,69 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
       return;
     }
 
-    const validMedications = formData.medications.filter((med) => med.name.trim() !== "");
-    if (validMedications.length === 0 && !formData.instructions.trim()) {
+    const medications = formData.medications.filter((item) => item.name.trim() !== "");
+    if (medications.length === 0 && !formData.instructions.trim()) {
       toast.error("Ajoutez au moins un médicament ou des instructions.");
       return;
     }
 
-    const body = {
+    const payload = {
       patient_id: formData.patientId,
       date: formData.date,
-      medications: validMedications,
+      medications,
       instructions: formData.instructions,
     };
 
     try {
-      let saved;
-      if (editingPrescription) {
-        saved = await updatePrescriptionApi(editingPrescription.id, body);
-        const normalized = normalizePrescription(saved);
-        setPrescriptions((prev) => prev.map((p) => (p.id === normalized.id ? normalized : p)));
-        toast.success("Ordonnance mise à jour", { description: normalized.patientName });
-      } else {
-        saved = await createPrescriptionApi(body);
-        const normalized = normalizePrescription(saved);
-        setPrescriptions((prev) => [normalized, ...prev]);
-        toast.success("Ordonnance enregistrée", { description: normalized.patientName });
-      }
-      addToHistory?.(
-        editingPrescription ? "Ordonnance modifiée" : "Ordonnance",
-        `${editingPrescription ? 'Modification' : 'Création'} ordonnance pour ${saved.patientName}`,
+      const saved = editingPrescription
+        ? normalizePrescription(await updatePrescriptionApi(editingPrescription.id, payload), currentUser)
+        : normalizePrescription(await createPrescriptionApi(payload), currentUser);
+
+      setPrescriptions((prev) =>
+        editingPrescription
+          ? prev.map((item) => (item.id === saved.id ? saved : item))
+          : [saved, ...prev]
+      );
+
+      toast.success(editingPrescription ? "Ordonnance mise à jour" : "Ordonnance enregistrée");
+      await addToHistory?.(
+        editingPrescription ? "Ordonnance modifiée" : "Ordonnance créée",
+        `${editingPrescription ? "Mise à jour" : "Création"} ordonnance pour ${saved.patientName}`,
         currentUser
       );
       resetForm();
     } catch (err) {
       console.error(err);
-      toast.error("Erreur API");
+      toast.error(err.response?.data?.error || "Erreur API ordonnance");
+    }
+  };
+
+  const handleDelete = async (prescription) => {
+    if (!window.confirm("Supprimer cette ordonnance ?")) return;
+    try {
+      await deletePrescriptionApi(prescription.id);
+      setPrescriptions((prev) => prev.filter((item) => item.id !== prescription.id));
+      toast.success("Ordonnance supprimée");
+      await addToHistory?.("Ordonnance supprimée", `Suppression ordonnance pour ${prescription.patientName}`, currentUser);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erreur suppression ordonnance");
     }
   };
 
   const handleExportPdf = (prescription) => {
     const meds = prescription.medications
       .map(
-        (med, idx) =>
-          `<tr><td>${idx + 1}</td><td>${escapeHtml(med.name)}</td><td>${escapeHtml(med.dosage)}</td><td>${escapeHtml(med.frequency)}</td><td>${escapeHtml(med.duration)}</td></tr>`
+        (medication, index) =>
+          `<tr><td>${index + 1}</td><td>${escapeHtml(medication.name)}</td><td>${escapeHtml(
+            medication.dosage
+          )}</td><td>${escapeHtml(medication.frequency)}</td><td>${escapeHtml(medication.duration)}</td></tr>`
       )
       .join("");
 
     const printable = window.open("", "_blank", "width=900,height=700");
     if (!printable) {
-      toast.error("Impossible d'ouvrir la fenï¿½tre d'export PDF.");
+      toast.error("Impossible d'ouvrir la fenêtre d'export PDF.");
       return;
     }
 
@@ -212,22 +218,22 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
           </style>
         </head>
         <body>
-          <h1>Ordonnance mï¿½dicale</h1>
+          <h1>Ordonnance médicale</h1>
           <p><strong>Patient :</strong> ${escapeHtml(prescription.patientName)}</p>
-          <p><strong>Mï¿½decin :</strong> ${escapeHtml(prescription.doctor)}</p>
+          <p><strong>Médecin :</strong> ${escapeHtml(prescription.doctor)}</p>
           <p><strong>Date :</strong> ${escapeHtml(new Date(prescription.date).toLocaleDateString("fr-FR"))}</p>
           <table>
             <thead>
               <tr>
                 <th>#</th>
-                <th>Mï¿½dicament</th>
+                <th>Médicament</th>
                 <th>Dosage</th>
-                <th>Frï¿½quence</th>
-                <th>Durï¿½e</th>
+                <th>Fréquence</th>
+                <th>Durée</th>
               </tr>
             </thead>
             <tbody>
-              ${meds || "<tr><td colspan='5'>Aucun mï¿½dicament</td></tr>"}
+              ${meds || "<tr><td colspan='5'>Aucun médicament</td></tr>"}
             </tbody>
           </table>
           <div class="box">
@@ -241,72 +247,57 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
     printable.document.close();
     printable.focus();
     setTimeout(() => printable.print(), 300);
-
-    addToHistory?.("Export PDF", `Export ordonnance PDF pour ${prescription.patientName}`, currentUser);
-    toast.success("Export PDF prï¿½t", { description: "Sï¿½lectionnez 'Enregistrer en PDF' dans la fenï¿½tre d'impression." });
+    toast.success("Export PDF prêt");
   };
 
-  const handleSend = (prescription) => {
+  const handleSend = async (prescription) => {
     const selectedChannel = sendChannels[prescription.id] || "messagerie";
-
     setPrescriptions((prev) =>
       prev.map((item) =>
         item.id === prescription.id
-          ? {
-              ...item,
-              sentAt: new Date().toISOString(),
-              sentVia: selectedChannel,
-            }
+          ? { ...item, sentAt: new Date().toISOString(), sentVia: selectedChannel }
           : item
       )
     );
-
-    addToHistory?.(
+    await addToHistory?.(
       "Envoi ordonnance",
-      `Ordonnance envoyï¿½e ï¿½ ${prescription.patientName} via ${selectedChannel}`,
+      `Ordonnance envoyée à ${prescription.patientName} via ${selectedChannel}`,
       currentUser
     );
-    toast.success("Ordonnance envoyï¿½e", { description: `${prescription.patientName} via ${selectedChannel}` });
-  };
-
-  const handlePatientSelect = (patientId) => {
-    const patient = patients.find((item) => String(item.id) === String(patientId));
-    setFormData((prev) => ({
-      ...prev,
-      patientId,
-      patientName: patient?.username || "",
-    }));
+    toast.success("Ordonnance envoyée");
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-primary">Ordonnances</h2>
-          <p className="text-muted-foreground">Gestion sï¿½parï¿½e des prescriptions</p>
+          <p className="text-muted-foreground">Gestion des prescriptions reliées au backend</p>
         </div>
         <Button
           onClick={() => setShowForm((prev) => !prev)}
-          className="bg-green-600 hover:bg-green-700 text-white rounded-xl"
+          className="rounded-xl bg-green-600 text-white hover:bg-green-700"
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           Nouvelle ordonnance
         </Button>
       </div>
 
       {showForm && (
-        <div className="bg-white border border-border rounded-2xl p-6 space-y-6">
-          <h3 className="text-xl font-semibold text-primary">Crï¿½er une ordonnance</h3>
+        <div className="space-y-6 rounded-2xl border border-border bg-white p-6">
+          <h3 className="text-xl font-semibold text-primary">
+            {editingPrescription ? "Modifier l'ordonnance" : "Créer une ordonnance"}
+          </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <Label>Patient *</Label>
               <select
                 value={formData.patientId}
-                onChange={(e) => handlePatientSelect(e.target.value)}
-                className="w-full rounded-xl px-4 py-3 border border-border focus:ring-4 focus:ring-primary/20 focus:outline-none"
+                onChange={(e) => setFormData((prev) => ({ ...prev, patientId: e.target.value }))}
+                className="w-full rounded-xl border border-border px-4 py-3 focus:outline-none focus:ring-4 focus:ring-primary/20"
               >
-                <option value="">Sï¿½lectionner un patient</option>
+                <option value="">Sélectionner un patient</option>
                 {patients.map((patient) => (
                   <option key={patient.id} value={patient.id}>
                     {patient.username}
@@ -326,9 +317,9 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
           </div>
 
           <div className="space-y-3">
-            <Label className="text-base font-semibold">Mï¿½dicaments</Label>
+            <Label className="text-base font-semibold">Médicaments</Label>
             {formData.medications.map((medication, index) => (
-              <div key={`${index}-${medication.name}`} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
+              <div key={`medication-form-${index}`} className="grid grid-cols-1 gap-2 md:grid-cols-5 md:items-end">
                 <Input
                   value={medication.name}
                   onChange={(e) => updateMedication(index, "name", e.target.value)}
@@ -344,13 +335,13 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
                 <Input
                   value={medication.frequency}
                   onChange={(e) => updateMedication(index, "frequency", e.target.value)}
-                  placeholder="Frï¿½quence"
+                  placeholder="Fréquence"
                   className="rounded-xl"
                 />
                 <Input
                   value={medication.duration}
                   onChange={(e) => updateMedication(index, "duration", e.target.value)}
-                  placeholder="Durï¿½e"
+                  placeholder="Durée"
                   className="rounded-xl"
                 />
                 <Button
@@ -360,12 +351,13 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
                   disabled={formData.medications.length === 1}
                   onClick={() => removeMedication(index)}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             ))}
             <Button type="button" variant="outline" className="rounded-xl border-dashed" onClick={addMedication}>
-              <Plus className="w-4 h-4 mr-2" /> Ajouter un mï¿½dicament
+              <Plus className="mr-2 h-4 w-4" />
+              Ajouter un médicament
             </Button>
           </div>
 
@@ -376,7 +368,7 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
               onChange={(e) => setFormData((prev) => ({ ...prev, instructions: e.target.value }))}
               rows={4}
               className="rounded-xl"
-              placeholder="Conseils et prï¿½cautions pour le patient"
+              placeholder="Conseils et précautions pour le patient"
             />
           </div>
 
@@ -384,20 +376,20 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
             <Button variant="outline" className="rounded-xl" onClick={resetForm}>
               Annuler
             </Button>
-            <Button className="bg-green-600 hover:bg-green-700 text-white rounded-xl" onClick={savePrescription}>
+            <Button className="rounded-xl bg-green-600 text-white hover:bg-green-700" onClick={savePrescription}>
               Enregistrer
             </Button>
           </div>
         </div>
       )}
 
-      <div className="bg-white border border-border rounded-2xl p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+      <div className="space-y-4 rounded-2xl border border-border bg-white p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-xl font-semibold text-primary">Historique des ordonnances</h3>
           <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="pl-10 rounded-xl"
+              className="rounded-xl pl-10"
               placeholder="Rechercher un patient"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -412,63 +404,42 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
         ) : (
           <div className="space-y-3">
             {filteredPrescriptions.map((item) => (
-              <div key={item.id} className="border border-border rounded-xl p-4 space-y-3 bg-gray-50/60">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              <div key={item.id} className="space-y-3 rounded-xl border border-border bg-gray-50/60 p-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h4 className="font-semibold text-foreground flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-green-700" />
+                    <h4 className="flex items-center gap-2 font-semibold text-foreground">
+                      <FileText className="h-4 w-4 text-green-700" />
                       {item.patientName}
                     </h4>
-                    <p className="text-sm text-muted-foreground flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      {new Date(item.date).toLocaleDateString("fr-FR")} ï¿½ {item.doctor}
+                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="h-4 w-4" />
+                      {new Date(item.date).toLocaleDateString("fr-FR")} • {item.doctor}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={() => handleExportPdf(item)}
-                    >
-                      <Download className="w-4 h-4 mr-1" /> Export PDF
+                    <Button size="sm" variant="outline" className="rounded-xl" onClick={() => handleExportPdf(item)}>
+                      <Download className="mr-1 h-4 w-4" />
+                      Export PDF
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
                       className="text-indigo-600"
                       onClick={() => {
-                        // load values into form for editing
                         setEditingPrescription(item);
                         setFormData({
-                          patientId: item.patient_id || item.patientId || item.patient?.id || "",
-                          patientName: item.patient?.username || item.patientName || "",
-                          date: item.date || "",
-                          medications: Array.isArray(item.medications) && item.medications.length > 0 ? item.medications : [{ ...EMPTY_MEDICATION }],
-                          instructions: item.instructions || "",
+                          patientId: item.patientId,
+                          date: item.date,
+                          medications: item.medications.length > 0 ? item.medications : [{ ...EMPTY_MEDICATION }],
+                          instructions: item.instructions,
                         });
                         setShowForm(true);
                       }}
                     >
-                      <Edit className="w-4 h-4" />
+                      <Edit className="h-4 w-4" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-red-600"
-                      onClick={async () => {
-                        if (!window.confirm('Supprimer cette ordonnance ?')) return;
-                        try {
-                          await deletePrescriptionApi(item.id);
-                          setPrescriptions((prev) => prev.filter((p) => p.id !== item.id));
-                          toast.success('Ordonnance supprimÃ©e');
-                        } catch (err) {
-                          console.error(err);
-                          toast.error('Erreur suppression');
-                        }
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
+                    <Button size="sm" variant="ghost" className="text-red-600" onClick={() => handleDelete(item)}>
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                     <select
                       value={sendChannels[item.id] || "messagerie"}
@@ -479,26 +450,27 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
                       <option value="email">Email</option>
                       <option value="sms">SMS</option>
                     </select>
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl" onClick={() => handleSend(item)}>
-                      <Send className="w-4 h-4 mr-1" /> Envoyer
+                    <Button size="sm" className="rounded-xl bg-blue-600 text-white hover:bg-blue-700" onClick={() => handleSend(item)}>
+                      <Send className="mr-1 h-4 w-4" />
+                      Envoyer
                     </Button>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {item.medications.length === 0 && <Badge variant="outline">Aucun mï¿½dicament</Badge>}
-                  {item.medications.map((med, medIndex) => (
-                    <Badge key={`${item.id}-med-${medIndex}`} variant="secondary" className="rounded-full">
-                      <Pill className="w-3 h-3 mr-1" /> {med.name || "Mï¿½dicament"}
+                  {item.medications.length === 0 && <Badge variant="outline">Aucun médicament</Badge>}
+                  {item.medications.map((medication, index) => (
+                    <Badge key={`${item.id}-med-${index}`} variant="secondary" className="rounded-full">
+                      <Pill className="mr-1 h-3 w-3" />
+                      {medication.name || "Médicament"}
                     </Badge>
                   ))}
                 </div>
 
                 {item.instructions && <p className="text-sm text-muted-foreground">{item.instructions}</p>}
-
                 {item.sentAt && (
                   <p className="text-xs text-emerald-700">
-                    Envoyï¿½e le {new Date(item.sentAt).toLocaleString("fr-FR")} via {item.sentVia}
+                    Envoyée le {new Date(item.sentAt).toLocaleString("fr-FR")} via {item.sentVia}
                   </p>
                 )}
               </div>
@@ -511,4 +483,3 @@ const OrdonnancesPage = ({ currentUser, addToHistory, patients = [] }) => {
 };
 
 export default OrdonnancesPage;
-

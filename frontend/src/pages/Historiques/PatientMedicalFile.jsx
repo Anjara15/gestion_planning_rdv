@@ -54,13 +54,13 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
           diagnosis: r.diagnosis,
           recommendations: r.recommendations || [],
           medications: r.medications || [],
-          doctor: r.doctor || (r.doctor_id ? `Dr. ${r.doctor_id}` : "MÃ©decin inconnu"),
+          doctor: r.doctor || (r.doctor_id ? `Dr. ${r.doctor_id}` : "Médecin inconnu"),
         }));
 
         setMedicalRecords(normalized);
       } catch (err) {
         console.error("[useMedicalRecords]", err);
-        setError("Erreur lors du chargement des dossiers mÃ©dicaux: " + (err.message || ""));
+        setError("Erreur lors du chargement des dossiers médicaux: " + (err.message || ""));
       } finally {
         setLoading(false);
       }
@@ -91,7 +91,7 @@ const MedicalRecordCard = ({ record }) => {
           <div>
             <h4 className="font-semibold text-base sm:text-lg text-foreground">{record.title}</h4>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              {formattedDate} â€¢ Dr. {record.doctor}
+              {formattedDate} â¢ Dr. {record.doctor}
             </p>
           </div>
         </div>
@@ -105,7 +105,7 @@ const MedicalRecordCard = ({ record }) => {
 
         {record.symptoms?.length > 0 && (
           <div>
-            <h5 className="font-medium text-sm sm:text-base text-foreground mb-2">SymptÃ´mes :</h5>
+            <h5 className="font-medium text-sm sm:text-base text-foreground mb-2">Symptômes :</h5>
             <div className="flex flex-wrap gap-2">
               {record.symptoms.map((symptom, index) => (
                 <Badge key={index} variant="secondary" className="rounded-xl text-xs sm:text-sm">
@@ -127,7 +127,7 @@ const MedicalRecordCard = ({ record }) => {
 
         {record.medications?.length > 0 && (
           <div>
-            <h5 className="font-medium text-sm sm:text-base text-foreground mb-2">MÃ©dicaments prescrits :</h5>
+            <h5 className="font-medium text-sm sm:text-base text-foreground mb-2">Médicaments prescrits :</h5>
             <div className="space-y-1">
               {record.medications.map((med, index) => (
                 <div key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -149,7 +149,7 @@ const MedicalRecordCard = ({ record }) => {
             <ul className="space-y-1">
               {record.recommendations.map((rec, index) => (
                 <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
-                  <span className="text-primary mt-1">â€¢</span>
+                  <span className="text-primary mt-1">â¢</span>
                   <span>{rec}</span>
                 </li>
               ))}
@@ -187,8 +187,8 @@ const PatientMedicalFile = ({ isOpen, onClose, patient, currentUser, addToHistor
   useEffect(() => {
     if (isOpen && patient) {
       addToHistory?.(
-        "Consultation dossier mÃ©dical",
-        `Ouverture du dossier mÃ©dical de ${patient.username}`,
+        "Consultation dossier médical",
+        `Ouverture du dossier médical de ${patient.username}`,
         currentUser
       );
     }
@@ -205,7 +205,7 @@ const PatientMedicalFile = ({ isOpen, onClose, patient, currentUser, addToHistor
           size="sm"
           onClick={onClose}
           className="absolute top-4 right-4 rounded-full hover:bg-gray-100 w-10 h-10"
-          aria-label="Fermer le dossier mÃ©dical"
+          aria-label="Fermer le dossier médical"
         >
           <X className="w-5 h-5" />
         </Button>
@@ -223,7 +223,7 @@ const PatientMedicalFile = ({ isOpen, onClose, patient, currentUser, addToHistor
             <div className="flex items-center gap-3">
               <Calendar className="w-5 h-5 text-primary" />
               <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Ã‚ge</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Âge</p>
                 <p className="font-medium text-sm sm:text-base">{patient.age} ans</p>
               </div>
             </div>
@@ -231,7 +231,7 @@ const PatientMedicalFile = ({ isOpen, onClose, patient, currentUser, addToHistor
               <FileText className="w-5 h-5 text-primary" />
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Dossiers</p>
-                <p className="font-medium text-sm sm:text-base">{medicalRecords.length} entrÃ©es</p>
+                <p className="font-medium text-sm sm:text-base">{medicalRecords.length} entrées</p>
               </div>
             </div>
           </div>
@@ -260,7 +260,7 @@ const PatientMedicalFile = ({ isOpen, onClose, patient, currentUser, addToHistor
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
               <p className="text-sm sm:text-base text-muted-foreground mt-4">
-                Chargement des dossiers mÃ©dicaux...
+                Chargement des dossiers médicaux...
               </p>
             </div>
           ) : error ? (
@@ -270,17 +270,17 @@ const PatientMedicalFile = ({ isOpen, onClose, patient, currentUser, addToHistor
                 {error}
               </h3>
               <Button variant="outline" onClick={() => window.location.reload()}>
-                RÃ©essayer
+                Réessayer
               </Button>
             </div>
           ) : filteredRecords.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-base sm:text-lg font-medium text-muted-foreground mb-2">
-                Aucun dossier mÃ©dical
+                Aucun dossier médical
               </h3>
               <p className="text-sm sm:text-base text-muted-foreground">
-                Ce patient n'a pas encore de dossier mÃ©dical enregistrÃ©.
+                Ce patient n'a pas encore de dossier médical enregistré.
               </p>
               <Button variant="outline" className="mt-4 text-sm sm:text-base">
                 Ajouter un nouveau dossier
@@ -299,7 +299,7 @@ const PatientMedicalFile = ({ isOpen, onClose, patient, currentUser, addToHistor
         <div className="p-4 sm:p-6 border-t border-border bg-white">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <p className="text-xs sm:text-sm text-muted-foreground">
-              DerniÃ¨re consultation :{" "}
+              Dernière consultation :{" "}
               {medicalRecords.length > 0
                 ? new Date(
                     medicalRecords.sort(

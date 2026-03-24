@@ -1,14 +1,26 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { toast } from "sonner";
-import { Calendar, User, FileText, Save, Pill, Plus, X, Stethoscope, Clock, Search, Filter, Eye, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  Edit,
+  FileText,
+  Pill,
+  Plus,
+  Save,
+  Search,
+  Stethoscope,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-
-import axios from "axios";
 
 const _apiBaseRaw = import.meta.env.VITE_API_URL || "http://localhost:3000";
 const _apiBase = String(_apiBaseRaw).replace(/\/+$/, "");
@@ -19,229 +31,213 @@ const getTokenHeader = () => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-async function fetchConsultationsFromApi(patientId) {
-  const params = {};
-  if (patientId) params.patient_id = patientId;
-  const resp = await axios.get(`${API_BASE_URL}/consultations`, { params, headers: getTokenHeader() });
+const fetchConsultationsFromApi = async () => {
+  const resp = await axios.get(`${API_BASE_URL}/consultations`, {
+    headers: getTokenHeader(),
+  });
   return resp.data;
-}
+};
 
-async function createConsultationApi(body) {
-  const resp = await axios.post(`${API_BASE_URL}/consultations`, body, { headers: { "Content-Type": "application/json", ...getTokenHeader() } });
+const createConsultationApi = async (body) => {
+  const resp = await axios.post(`${API_BASE_URL}/consultations`, body, {
+    headers: { "Content-Type": "application/json", ...getTokenHeader() },
+  });
   return resp.data;
-}
+};
 
-async function updateConsultationApi(id, body) {
-  const resp = await axios.put(`${API_BASE_URL}/consultations/${id}`, body, { headers: { "Content-Type": "application/json", ...getTokenHeader() } });
+const updateConsultationApi = async (id, body) => {
+  const resp = await axios.put(`${API_BASE_URL}/consultations/${id}`, body, {
+    headers: { "Content-Type": "application/json", ...getTokenHeader() },
+  });
   return resp.data;
-}
+};
 
-async function deleteConsultationApi(id) {
-  const resp = await axios.delete(`${API_BASE_URL}/consultations/${id}`, { headers: getTokenHeader() });
+const deleteConsultationApi = async (id) => {
+  const resp = await axios.delete(`${API_BASE_URL}/consultations/${id}`, {
+    headers: getTokenHeader(),
+  });
   return resp.data;
-}
+};
 
-const ConsultationCard = ({ consultation }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  
-  const formatDate = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+const EMPTY_FORM = {
+  patientId: "",
+  date: new Date().toISOString().split("T")[0],
+  time: new Date().toTimeString().slice(0, 5),
+  symptoms: [],
+  examination: "",
+  diagnosis: "",
+  treatment: "",
+  recommendations: [],
+  followUp: "",
+  medications: [],
+};
+
+const normalizeConsultation = (item, patients = []) => {
+  const fallbackPatient =
+    patients.find((patient) => String(patient.id) === String(item?.patient_id || item?.patientId)) || null;
+
+  return {
+    ...item,
+    patient_id: item?.patient_id || item?.patientId || fallbackPatient?.id || "",
+    patientName: item?.patientName || item?.patient?.username || fallbackPatient?.username || "Patient",
+    date: item?.date || "",
+    time: item?.time || "",
+    symptoms: Array.isArray(item?.symptoms) ? item.symptoms : [],
+    examination: item?.examination || "",
+    diagnosis: item?.diagnosis || "",
+    treatment: item?.treatment || "",
+    recommendations: Array.isArray(item?.recommendations) ? item.recommendations : [],
+    followUp: item?.followUp || item?.follow_up || "",
+    medications: Array.isArray(item?.medications) ? item.medications : [],
+  };
+};
+
+const ConsultationCard = ({ consultation, onEdit, onDelete }) => {
+  const formatDate = (dateStr) =>
+    new Date(dateStr).toLocaleDateString("fr-FR", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
-  };
 
-  const formatTime = (timeStr) => {
-    return timeStr || 'Non spécifiée';
-  };
-
-  const getDiagnosisColor = (diagnosis) => {
-    if (diagnosis.toLowerCase().includes('urgent') || diagnosis.toLowerCase().includes('grave')) {
-      return 'border-red-200 bg-red-50 text-red-800';
+  const diagnosisColor = (() => {
+    const diagnosis = String(consultation.diagnosis || "").toLowerCase();
+    if (diagnosis.includes("urgent") || diagnosis.includes("grave")) {
+      return "border-red-200 bg-red-50 text-red-800";
     }
-    if (diagnosis.toLowerCase().includes('suivi') || diagnosis.toLowerCase().includes('contrôle')) {
-      return 'border-blue-200 bg-blue-50 text-blue-800';
+    if (diagnosis.includes("suivi") || diagnosis.includes("contrôle")) {
+      return "border-blue-200 bg-blue-50 text-blue-800";
     }
-    return 'border-green-200 bg-green-50 text-green-800';
-  };
+    return "border-green-200 bg-green-50 text-green-800";
+  })();
 
   return (
-    <div className="border border-border rounded-xl p-6 hover:shadow-lg transition-all duration-200 bg-gradient-to-r from-white to-gray-50/30">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-start space-x-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-teal-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
-            {consultation.patientName?.charAt(0)?.toUpperCase() || 'P'}
+    <div className="rounded-xl border border-border bg-gradient-to-r from-white to-gray-50/30 p-6">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-teal-600 text-lg font-semibold text-white">
+            {consultation.patientName.charAt(0).toUpperCase()}
           </div>
           <div>
-            <h4 className="font-bold text-lg text-foreground">{consultation.patientName}</h4>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <h4 className="text-lg font-bold text-foreground">{consultation.patientName}</h4>
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
+                <Calendar className="h-4 w-4" />
                 <span>{formatDate(consultation.date)}</span>
               </div>
               <div className="flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                <span>{formatTime(consultation.time)}</span>
+                <Clock className="h-4 w-4" />
+                <span>{consultation.time || "Non spécifiée"}</span>
               </div>
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
-          {/* edit/delete actions could be wired up by parent via context or callbacks; placeholder icons for now */}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-indigo-600"
-            onClick={() => {
-              // event will bubble; parent component does not currently have handler; we will use a custom event to signal
-              const evt = new CustomEvent('editConsultation', { detail: consultation });
-              window.dispatchEvent(evt);
-            }}
-          >
-            <Edit className="w-4 h-4" />
+          <Button size="sm" variant="ghost" className="text-indigo-600" onClick={() => onEdit(consultation)}>
+            <Edit className="h-4 w-4" />
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-red-600"
-            onClick={async () => {
-              if (!window.confirm('Supprimer cette consultation ?')) return;
-              try {
-                await deleteConsultationApi(consultation.id);
-                const evt = new CustomEvent('deletedConsultation', { detail: consultation.id });
-                window.dispatchEvent(evt);
-              } catch (err) {
-                console.error(err);
-                toast.error('Erreur suppression');
-              }
-            }}
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="rounded-xl"
-          >
-            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          <Button size="sm" variant="ghost" className="text-red-600" onClick={() => onDelete(consultation)}>
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
       <div className="space-y-4">
-        {/* Diagnostic - Toujours visible */}
-        <div>
-          <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getDiagnosisColor(consultation.diagnosis)}`}>
-            <Stethoscope className="w-4 h-4 inline mr-1" />
-            {consultation.diagnosis}
-          </div>
+        <div className={`inline-block rounded-full px-3 py-1 text-sm font-medium ${diagnosisColor}`}>
+          <Stethoscope className="mr-1 inline h-4 w-4" />
+          {consultation.diagnosis}
         </div>
 
-        {/* Symptômes - Toujours visibles si présents */}
-        {consultation.symptoms && consultation.symptoms.length > 0 && (
-          <div>
-            <div className="flex flex-wrap gap-2">
-              {consultation.symptoms.slice(0, 3).map((symptom, index) => (
-                <Badge key={index} variant="secondary" className="rounded-full text-xs">
-                  {symptom}
-                </Badge>
-              ))}
-              {consultation.symptoms.length > 3 && !isExpanded && (
-                <Badge variant="outline" className="rounded-full text-xs text-muted-foreground">
-                  +{consultation.symptoms.length - 3} autres
-                </Badge>
-              )}
-              {isExpanded && consultation.symptoms.slice(3).map((symptom, index) => (
-                <Badge key={index + 3} variant="secondary" className="rounded-full text-xs">
-                  {symptom}
-                </Badge>
-              ))}
-            </div>
+        {consultation.symptoms.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {consultation.symptoms.map((symptom, index) => (
+              <Badge key={`${consultation.id}-symptom-${index}`} variant="secondary" className="rounded-full text-xs">
+                {symptom}
+              </Badge>
+            ))}
           </div>
         )}
 
-        {/* Détails étendus */}
-        {isExpanded && (
-          <div className="space-y-4 pt-4 border-t border-gray-100">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <h5 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-teal-600" />
-                    Examen clinique
-                  </h5>
-                  <p className="text-sm text-muted-foreground bg-gray-50 p-3 rounded-lg leading-relaxed">
-                    {consultation.examination}
-                  </p>
-                </div>
-
-                {consultation.treatment && (
-                  <div>
-                    <h5 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-                      <Pill className="w-4 h-4 text-blue-600" />
-                      Traitement
-                    </h5>
-                    <p className="text-sm text-muted-foreground bg-blue-50 p-3 rounded-lg leading-relaxed">
-                      {consultation.treatment}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                {consultation.recommendations && consultation.recommendations.length > 0 && (
-                  <div>
-                    <h5 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-                      <User className="w-4 h-4 text-purple-600" />
-                      Recommandations
-                    </h5>
-                    <div className="space-y-2">
-                      {consultation.recommendations.map((rec, index) => (
-                        <div key={index} className="flex items-start gap-2 text-sm text-muted-foreground bg-purple-50 p-2 rounded-lg">
-                          <div className="w-2 h-2 bg-purple-400 rounded-full mt-2 flex-shrink-0"></div>
-                          <span className="leading-relaxed">{rec}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {consultation.followUp && (
-                  <div>
-                    <h5 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-orange-600" />
-                      Suivi recommandé
-                    </h5>
-                    <p className="text-sm text-muted-foreground bg-orange-50 p-3 rounded-lg">
-                      {consultation.followUp}
-                    </p>
-                  </div>
-                )}
-              </div>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="space-y-4">
+            <div>
+              <h5 className="mb-2 flex items-center gap-2 font-semibold text-foreground">
+                <FileText className="h-4 w-4 text-teal-600" />
+                Examen clinique
+              </h5>
+              <p className="rounded-lg bg-gray-50 p-3 text-sm text-muted-foreground">
+                {consultation.examination || "Non renseigné"}
+              </p>
             </div>
 
-            {consultation.medications && consultation.medications.length > 0 && (
+            {consultation.treatment && (
               <div>
-                <h5 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-                  <Pill className="w-4 h-4 text-green-600" />
-                  Médicaments prescrits
+                <h5 className="mb-2 flex items-center gap-2 font-semibold text-foreground">
+                  <Pill className="h-4 w-4 text-blue-600" />
+                  Traitement
                 </h5>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {consultation.medications.map((med, index) => (
-                    <div key={index} className="bg-green-50 border border-green-200 p-3 rounded-lg">
-                      <div className="font-medium text-green-800">{med.name}</div>
-                      <div className="text-sm text-green-600 mt-1">
-                        {med.dosage} • {med.frequency} • {med.duration}
-                      </div>
+                <p className="rounded-lg bg-blue-50 p-3 text-sm text-muted-foreground">
+                  {consultation.treatment}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {consultation.recommendations.length > 0 && (
+              <div>
+                <h5 className="mb-2 flex items-center gap-2 font-semibold text-foreground">
+                  <User className="h-4 w-4 text-purple-600" />
+                  Recommandations
+                </h5>
+                <div className="space-y-2">
+                  {consultation.recommendations.map((recommendation, index) => (
+                    <div
+                      key={`${consultation.id}-recommendation-${index}`}
+                      className="rounded-lg bg-purple-50 p-2 text-sm text-muted-foreground"
+                    >
+                      {recommendation}
                     </div>
                   ))}
                 </div>
               </div>
             )}
+
+            {consultation.followUp && (
+              <div>
+                <h5 className="mb-2 flex items-center gap-2 font-semibold text-foreground">
+                  <Calendar className="h-4 w-4 text-orange-600" />
+                  Suivi recommandé
+                </h5>
+                <p className="rounded-lg bg-orange-50 p-3 text-sm text-muted-foreground">
+                  {consultation.followUp}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {consultation.medications.length > 0 && (
+          <div>
+            <h5 className="mb-2 flex items-center gap-2 font-semibold text-foreground">
+              <Pill className="h-4 w-4 text-green-600" />
+              Médicaments prescrits
+            </h5>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {consultation.medications.map((medication, index) => (
+                <div
+                  key={`${consultation.id}-medication-${index}`}
+                  className="rounded-lg border border-green-200 bg-green-50 p-3"
+                >
+                  <div className="font-medium text-green-800">{medication.name || "Médicament"}</div>
+                  <div className="mt-1 text-sm text-green-700">
+                    {[medication.dosage, medication.frequency, medication.duration].filter(Boolean).join(" • ")}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -249,260 +245,209 @@ const ConsultationCard = ({ consultation }) => {
   );
 };
 
-const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients }) => {
+const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients = [] }) => {
   const [consultations, setConsultations] = useState([]);
-  const [filteredConsultations, setFilteredConsultations] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingConsultation, setEditingConsultation] = useState(null);
   const [currentSymptom, setCurrentSymptom] = useState("");
   const [currentRecommendation, setCurrentRecommendation] = useState("");
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  
-  // Filtres et recherche
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
-  const [sortOrder, setSortOrder] = useState("desc"); // "desc" pour le plus récent en premier
-
-  const [formData, setFormData] = useState({
-    patientId: "",
-    patientName: "",
-    date: new Date().toISOString().split("T")[0],
-    time: new Date().toTimeString().slice(0, 5),
-    symptoms: [],
-    examination: "",
-    diagnosis: "",
-    treatment: "",
-    recommendations: [],
-    followUp: "",
-    medications: [],
-  });
+  const [successMessage, setSuccessMessage] = useState("");
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
   const loadConsultations = useCallback(async () => {
     try {
       const data = await fetchConsultationsFromApi();
-      setConsultations(Array.isArray(data) ? data : []);
+      setConsultations(Array.isArray(data) ? data.map((item) => normalizeConsultation(item, patients)) : []);
     } catch (err) {
       console.error("Erreur chargement consultations:", err);
+      toast.error("Erreur chargement consultations");
     }
-  }, [currentUser]);
-
-  // listen for edit/delete events from ConsultationCard
-  useEffect(() => {
-    const onEdit = (e) => {
-      const item = e.detail;
-      setEditingConsultation(item);
-      setFormData({
-        patientId: item.patient_id || item.patientId || item.patient?.id || "",
-        patientName: item.patient?.username || item.patientName || "",
-        date: item.date || "",
-        time: item.time || "",
-        symptoms: item.symptoms || [],
-        examination: item.examination || "",
-        diagnosis: item.diagnosis || "",
-        treatment: item.treatment || "",
-        recommendations: item.recommendations || [],
-        followUp: item.follow_up || item.followUp || "",
-        medications: item.medications || [],
-      });
-      setShowForm(true);
-    };
-    const onDeleted = (e) => {
-      const id = e.detail;
-      setConsultations((prev) => prev.filter((c) => c.id !== id));
-    };
-    window.addEventListener('editConsultation', onEdit);
-    window.addEventListener('deletedConsultation', onDeleted);
-    return () => {
-      window.removeEventListener('editConsultation', onEdit);
-      window.removeEventListener('deletedConsultation', onDeleted);
-    };
-  }, []);
+  }, [patients]);
 
   useEffect(() => {
     loadConsultations();
   }, [loadConsultations]);
 
-  // Filtrage et tri des consultations
-  useEffect(() => {
-    let filtered = [...consultations];
+  const filteredConsultations = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return consultations;
 
-    // Recherche par nom de patient ou diagnostic
-    if (searchTerm) {
-      filtered = filtered.filter(consultation => 
-        consultation.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        consultation.diagnosis.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        consultation.symptoms.some(symptom => 
-          symptom.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      );
-    }
-
-    // Filtre par date
-    if (dateFilter) {
-      filtered = filtered.filter(consultation => consultation.date === dateFilter);
-    }
-
-    // Tri par date
-    filtered.sort((a, b) => {
-      const dateA = new Date(a.date + ' ' + (a.time || '00:00'));
-      const dateB = new Date(b.date + ' ' + (b.time || '00:00'));
-      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+    return consultations.filter((consultation) => {
+      const bag = [
+        consultation.patientName,
+        consultation.diagnosis,
+        consultation.examination,
+        ...consultation.symptoms,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return bag.includes(query);
     });
-
-    setFilteredConsultations(filtered);
-  }, [consultations, searchTerm, dateFilter, sortOrder]);
-
-  const handleFormSubmit = async () => {
-    if (!formData.patientId || !formData.examination || !formData.diagnosis) {
-      toast.error("Champs requis manquants", { description: "Patient, examen et diagnostic sont obligatoires." });
-      return;
-    }
-
-    const body = {
-      patient_id: formData.patientId,
-      date: formData.date || "",
-      time: formData.time || "",
-      symptoms: formData.symptoms || [],
-      examination: formData.examination || "",
-      diagnosis: formData.diagnosis || "",
-      treatment: formData.treatment || "",
-      recommendations: formData.recommendations || [],
-      follow_up: formData.followUp || "",
-      medications: formData.medications || [],
-    };
-
-    try {
-      let saved;
-      if (editingConsultation) {
-        saved = await updateConsultationApi(editingConsultation.id, body);
-        setConsultations((prev) => prev.map((c) => (c.id === saved.id ? saved : c)));
-      } else {
-        saved = await createConsultationApi(body);
-        setConsultations([...consultations, saved]);
-      }
-
-      setSuccessMessage("Note de consultation enregistrée avec succès !");
-      setShowSuccess(true);
-      toast.success("Consultation enregistrée", { description: `${saved.patientName} — ${saved.date} à ${saved.time}` });
-
-      addToHistory?.(
-        editingConsultation ? "Consultation modifiée" : "Nouvelle consultation",
-        `${editingConsultation ? 'Mise à jour' : 'Consultation enregistrée'} pour ${saved.patientName}`,
-        currentUser
-      );
-
-      setTimeout(() => {
-        setShowSuccess(false);
-        setEditingConsultation(null);
-      }, 2000);
-
-      resetForm();
-      setEditingConsultation(null);
-    } catch (err) {
-      console.error(err);
-      toast.error(`Erreur API: ${err.message}`);
-    }
-  };
+  }, [consultations, searchTerm]);
 
   const resetForm = () => {
-    setFormData({
-      patientId: "",
-      patientName: "",
-      date: new Date().toISOString().split("T")[0],
-      time: new Date().toTimeString().slice(0, 5),
-      symptoms: [],
-      examination: "",
-      diagnosis: "",
-      treatment: "",
-      recommendations: [],
-      followUp: "",
-      medications: [],
-    });
+    setFormData(EMPTY_FORM);
+    setEditingConsultation(null);
+    setCurrentSymptom("");
+    setCurrentRecommendation("");
     setShowForm(false);
   };
 
-  const addSymptom = () => {
-    if (currentSymptom.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        symptoms: [...(prev.symptoms || []), currentSymptom.trim()],
-      }));
-      setCurrentSymptom("");
+  const handleEdit = (consultation) => {
+    setEditingConsultation(consultation);
+    setFormData({
+      patientId: consultation.patient_id,
+      date: consultation.date,
+      time: consultation.time,
+      symptoms: consultation.symptoms,
+      examination: consultation.examination,
+      diagnosis: consultation.diagnosis,
+      treatment: consultation.treatment,
+      recommendations: consultation.recommendations,
+      followUp: consultation.followUp,
+      medications: consultation.medications,
+    });
+    setShowForm(true);
+  };
+
+  const handleDelete = async (consultation) => {
+    if (!window.confirm("Supprimer cette consultation ?")) return;
+    try {
+      await deleteConsultationApi(consultation.id);
+      setConsultations((prev) => prev.filter((item) => item.id !== consultation.id));
+      toast.success("Consultation supprimée");
+      await addToHistory?.("Consultation supprimée", `Suppression de la consultation de ${consultation.patientName}`, currentUser);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erreur suppression consultation");
     }
+  };
+
+  const handleFormSubmit = async () => {
+    if (!formData.patientId || !formData.examination.trim() || !formData.diagnosis.trim()) {
+      toast.error("Patient, examen et diagnostic sont obligatoires.");
+      return;
+    }
+
+    const payload = {
+      patient_id: formData.patientId,
+      date: formData.date,
+      time: formData.time,
+      symptoms: formData.symptoms,
+      examination: formData.examination,
+      diagnosis: formData.diagnosis,
+      treatment: formData.treatment,
+      recommendations: formData.recommendations,
+      follow_up: formData.followUp,
+      medications: formData.medications,
+    };
+
+    try {
+      const saved = editingConsultation
+        ? normalizeConsultation(await updateConsultationApi(editingConsultation.id, payload), patients)
+        : normalizeConsultation(await createConsultationApi(payload), patients);
+
+      setConsultations((prev) =>
+        editingConsultation
+          ? prev.map((item) => (item.id === saved.id ? saved : item))
+          : [saved, ...prev]
+      );
+
+      setSuccessMessage(
+        editingConsultation
+          ? "Consultation mise à jour avec succès."
+          : "Consultation enregistrée avec succès."
+      );
+      toast.success(editingConsultation ? "Consultation mise à jour" : "Consultation enregistrée");
+      await addToHistory?.(
+        editingConsultation ? "Consultation modifiée" : "Nouvelle consultation",
+        `${editingConsultation ? "Mise à jour" : "Création"} consultation pour ${saved.patientName}`,
+        currentUser
+      );
+      resetForm();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || "Erreur API consultation");
+    }
+  };
+
+  const addSymptom = () => {
+    const value = currentSymptom.trim();
+    if (!value) return;
+    setFormData((prev) => ({ ...prev, symptoms: [...prev.symptoms, value] }));
+    setCurrentSymptom("");
   };
 
   const removeSymptom = (index) => {
     setFormData((prev) => ({
       ...prev,
-      symptoms: prev.symptoms?.filter((_, i) => i !== index) || [],
+      symptoms: prev.symptoms.filter((_, currentIndex) => currentIndex !== index),
     }));
   };
 
   const addRecommendation = () => {
-    if (currentRecommendation.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        recommendations: [...(prev.recommendations || []), currentRecommendation.trim()],
-      }));
-      setCurrentRecommendation("");
-    }
+    const value = currentRecommendation.trim();
+    if (!value) return;
+    setFormData((prev) => ({ ...prev, recommendations: [...prev.recommendations, value] }));
+    setCurrentRecommendation("");
   };
 
   const removeRecommendation = (index) => {
     setFormData((prev) => ({
       ...prev,
-      recommendations: prev.recommendations?.filter((_, i) => i !== index) || [],
+      recommendations: prev.recommendations.filter((_, currentIndex) => currentIndex !== index),
     }));
   };
 
   const handlePatientSelect = (patientId) => {
-    const selectedPatient = patients?.find((p) => p.id === patientId);
-    setFormData((prev) => ({
-      ...prev,
-      patientId,
-      patientName: selectedPatient?.username || "",
-    }));
+    setFormData((prev) => ({ ...prev, patientId }));
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div>
-            <h2 className="text-2xl font-bold text-primary">Consultations</h2>
-            <p className="text-muted-foreground">Gérer les notes de consultation</p>
-          </div>
+        <div>
+          <h2 className="text-2xl font-bold text-primary">Consultations</h2>
+          <p className="text-muted-foreground">Gérer les notes de consultation</p>
         </div>
         <Button
-          onClick={() => setShowForm(!showForm)}
-          className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl"
+          onClick={() => {
+            if (showForm && !editingConsultation) {
+              resetForm();
+            } else {
+              setShowForm((prev) => !prev);
+            }
+          }}
+          className="rounded-xl bg-teal-600 text-white hover:bg-teal-700"
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           Nouvelle consultation
         </Button>
       </div>
 
-      {showSuccess && (
+      {successMessage && (
         <Alert className="border-green-300 bg-green-50">
           <AlertDescription className="text-green-700">{successMessage}</AlertDescription>
         </Alert>
       )}
 
       {showForm && (
-        <div className="bg-white border border-border rounded-2xl p-6 space-y-6">
-          <h3 className="text-xl font-semibold text-primary">Nouvelle note de consultation</h3>
+        <div className="space-y-6 rounded-2xl border border-border bg-white p-6">
+          <h3 className="text-xl font-semibold text-primary">
+            {editingConsultation ? "Modifier la consultation" : "Nouvelle note de consultation"}
+          </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
               <Label>Patient *</Label>
               <select
                 value={formData.patientId}
                 onChange={(e) => handlePatientSelect(e.target.value)}
-                className="w-full rounded-xl px-4 py-3 border border-border focus:ring-4 focus:ring-primary/20 focus:outline-none"
+                className="w-full rounded-xl border border-border px-4 py-3 focus:outline-none focus:ring-4 focus:ring-primary/20"
               >
                 <option value="">Sélectionner un patient</option>
-                {patients?.map((patient) => (
+                {patients.map((patient) => (
                   <option key={patient.id} value={patient.id}>
                     {patient.username} ({patient.age} ans)
                   </option>
@@ -531,27 +476,33 @@ const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients }) => {
 
           <div>
             <Label>Symptômes</Label>
-            <div className="flex gap-2 mt-2">
+            <div className="mt-2 flex gap-2">
               <Input
                 value={currentSymptom}
                 onChange={(e) => setCurrentSymptom(e.target.value)}
                 placeholder="Ajouter un symptôme"
                 className="rounded-xl"
-                onKeyPress={(e) => e.key === "Enter" && addSymptom()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addSymptom();
+                  }
+                }}
               />
               <Button onClick={addSymptom} variant="outline" className="rounded-xl">
-                <Plus className="w-4 h-4" />
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {formData.symptoms?.map((symptom, index) => (
-                <Badge key={index} variant="secondary" className="rounded-xl">
+            <div className="mt-3 flex flex-wrap gap-2">
+              {formData.symptoms.map((symptom, index) => (
+                <Badge key={`symptom-${index}`} variant="secondary" className="rounded-xl">
                   {symptom}
                   <button
+                    type="button"
                     onClick={() => removeSymptom(index)}
                     className="ml-2 text-muted-foreground hover:text-foreground"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="h-3 w-3" />
                   </button>
                 </Badge>
               ))}
@@ -593,27 +544,33 @@ const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients }) => {
 
           <div>
             <Label>Recommandations</Label>
-            <div className="flex gap-2 mt-2">
+            <div className="mt-2 flex gap-2">
               <Input
                 value={currentRecommendation}
                 onChange={(e) => setCurrentRecommendation(e.target.value)}
                 placeholder="Ajouter une recommandation"
                 className="rounded-xl"
-                onKeyPress={(e) => e.key === "Enter" && addRecommendation()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addRecommendation();
+                  }
+                }}
               />
               <Button onClick={addRecommendation} variant="outline" className="rounded-xl">
-                <Plus className="w-4 h-4" />
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {formData.recommendations?.map((rec, index) => (
-                <Badge key={index} variant="outline" className="rounded-xl">
-                  {rec}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {formData.recommendations.map((recommendation, index) => (
+                <Badge key={`recommendation-${index}`} variant="outline" className="rounded-xl">
+                  {recommendation}
                   <button
+                    type="button"
                     onClick={() => removeRecommendation(index)}
                     className="ml-2 text-muted-foreground hover:text-foreground"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="h-3 w-3" />
                   </button>
                 </Badge>
               ))}
@@ -637,64 +594,42 @@ const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients }) => {
             <Button
               onClick={handleFormSubmit}
               disabled={!formData.patientId || !formData.examination || !formData.diagnosis}
-              className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl"
+              className="rounded-xl bg-teal-600 text-white hover:bg-teal-700"
             >
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="mr-2 h-4 w-4" />
               Enregistrer
             </Button>
           </div>
         </div>
       )}
 
-      {/* Section Historique améliorée */}
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h3 className="text-xl font-bold text-primary">Historique des consultations</h3>
           </div>
-          
-          {/* Barre de recherche et filtres */}
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher par patient ou diagnostic..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 rounded-xl w-full sm:w-72"
-              />
-            </div>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher par patient ou diagnostic..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="rounded-xl pl-10"
+            />
           </div>
         </div>
 
-
-        {/* Liste des consultations */}
         {filteredConsultations.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FileText className="w-10 h-10 text-gray-400" />
+          <div className="py-16 text-center">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">
+              <FileText className="h-10 w-10 text-gray-400" />
             </div>
-            <h4 className="text-lg font-semibold text-gray-600 mb-2">
-              {searchTerm || dateFilter ? "Aucun résultat trouvé" : "Aucune consultation enregistrée"}
+            <h4 className="mb-2 text-lg font-semibold text-gray-600">
+              {searchTerm ? "Aucun résultat trouvé" : "Aucune consultation enregistrée"}
             </h4>
-            <p className="text-gray-500 mb-6">
-              {searchTerm || dateFilter 
-                ? "Essayez de modifier vos critères de recherche" 
-                : "Commencez par créer votre première consultation"
-              }
+            <p className="text-gray-500">
+              {searchTerm ? "Essayez de modifier vos critères de recherche." : "Commencez par créer votre première consultation."}
             </p>
-            {(searchTerm || dateFilter) && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearchTerm("");
-                  setDateFilter("");
-                }}
-                className="rounded-xl"
-              >
-                Effacer les filtres
-              </Button>
-            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -702,6 +637,8 @@ const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients }) => {
               <ConsultationCard
                 key={consultation.id}
                 consultation={consultation}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
               />
             ))}
           </div>
@@ -712,5 +649,3 @@ const EnhancedConsultationsPage = ({ currentUser, addToHistory, patients }) => {
 };
 
 export default EnhancedConsultationsPage;
-
-

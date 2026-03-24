@@ -54,24 +54,22 @@ import {
 
 registerLocale("fr", fr);
 
-const PRESCRIPTIONS_STORAGE_KEY = "medecinPrescriptions";
-const PAYMENTS_STORAGE_KEY = "medecinPayments";
 const PATIENT_ACTIVITY_STORAGE_KEY = "patientActivities";
 const PATIENT_SPORTS_ACTIVITY_STORAGE_KEY = "patientSportsActivities";
 
 // Health tips data
 const healthTips = [
-  { id: 1, icon: Heart, text: "Buvez au moins 1,5L d'eau par jour pour rester hydratÃƒÂ©.", color: "text-blue-600" },
-  { id: 2, icon: Clock, text: "Dormez 7 ÃƒÂ  8 heures par nuit pour une santÃƒÂ© optimale.", color: "text-purple-600" },
+  { id: 1, icon: Heart, text: "Buvez au moins 1,5L d'eau par jour pour rester hydraté.", color: "text-blue-600" },
+  { id: 2, icon: Clock, text: "Dormez 7 Ã  8 heures par nuit pour une santé optimale.", color: "text-purple-600" },
   { id: 3, icon: Calendar, text: "Faites 30 minutes d'exercice physique 5 fois par semaine.", color: "text-green-600" },
-  { id: 4, icon: FileText, text: "Planifiez des bilans de santÃƒÂ© rÃƒÂ©guliers avec votre mÃƒÂ©decin.", color: "text-orange-600" },
+  { id: 4, icon: FileText, text: "Planifiez des bilans de santé réguliers avec votre médecin.", color: "text-orange-600" },
 ];
 
 // General notions for sidebar
 const _generalNotions = [
-  { id: 1, text: "Prenez vos rendez-vous ÃƒÂ  l'avance pour plus de disponibilitÃƒÂ©.", color: "text-cyan-600" },
-  { id: 2, text: "Mettez ÃƒÂ  jour votre profil pour une meilleure coordination.", color: "text-purple-600" },
-  { id: 3, text: "Annulez les RDV non nÃƒÂ©cessaires pour libÃƒÂ©rer des crÃƒÂ©neaux.", color: "text-orange-600" },
+  { id: 1, text: "Prenez vos rendez-vous Ã  l'avance pour plus de disponibilitÃ©.", color: "text-cyan-600" },
+  { id: 2, text: "Mettez à jour votre profil pour une meilleure coordination.", color: "text-purple-600" },
+  { id: 3, text: "Annulez les RDV non nécessaires pour libérer des créneaux.", color: "text-orange-600" },
 ];
 
 const PatientDashboard = ({ currentUser, logout }) => {
@@ -80,7 +78,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
   const didWelcomeRef = useRef(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState("");
-  // Plus besoin de sÃƒÂ©lectionner un mÃƒÂ©decin cÃƒÂ´tÃƒÂ© patient
+  // Plus besoin de sélectionner un médecin cété patient
   const [selectedSpecialty, setSelectedSpecialty] = useState("");
   const [demande, setDemande] = useState("");
   const [bookingStep, setBookingStep] = useState(1);
@@ -104,7 +102,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
   // patient document/payment form state
   const [docForm, setDocForm] = useState({ title: "", description: "", date: "" });
   const [editingDocId, setEditingDocId] = useState(null);
-  const [paymentForm, setPaymentForm] = useState({ amount: "", reference: "", method: "", status: "en_attente", date: "" });
+  const [paymentForm, setPaymentForm] = useState({ amount: "", description: "", status: "en_attente" });
   const [editingPaymentId, setEditingPaymentId] = useState(null);
   const [availableSlots, setAvailableSlots] = useState([]);
   const sidebarRef = useRef(null);
@@ -189,45 +187,17 @@ const PatientDashboard = ({ currentUser, logout }) => {
   const readStorageArray = (key) => {
     try {
       const raw = localStorage.getItem(key);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
+      const parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
-      console.error(`Error parsing storage key ${key}:`, error);
+      console.error(`Erreur lecture localStorage pour ${key}:`, error);
       return [];
     }
   };
 
   const normalizeText = (value) => String(value || "").trim().toLowerCase();
 
-  const patientIdentity = useMemo(() => {
-    const firstName = normalizeText(profile?.nom);
-    const lastName = normalizeText(profile?.prenom);
-    const fullName = normalizeText(`${profile?.nom || ""} ${profile?.prenom || ""}`);
-    const username = normalizeText(currentUser?.username);
-    const email = normalizeText(profile?.email || currentUser?.email);
-    const id = String(currentUser?.id || "").trim();
-
-    return {
-      id,
-      email,
-      names: [fullName, username, firstName, lastName].filter(Boolean),
-      fullName,
-    };
-  }, [currentUser?.id, currentUser?.username, currentUser?.email, profile?.nom, profile?.prenom, profile?.email]);
-
-  const matchesCurrentPatient = (entry) => {
-    if (!entry || typeof entry !== "object") return false;
-
-    const patientId = String(entry.patientId || entry.patient_id || entry.patient?.id || "").trim();
-    const patientName = normalizeText(entry.patientName || entry.patient_name || entry.patient?.username);
-    const patientEmail = normalizeText(entry.patientEmail || entry.email || entry.patient?.email);
-
-    if (patientIdentity.id && patientId && patientIdentity.id === patientId) return true;
-    if (patientIdentity.email && patientEmail && patientIdentity.email === patientEmail) return true;
-    if (patientName && patientIdentity.names.some((name) => name && (patientName.includes(name) || name.includes(patientName)))) return true;
-    return false;
-  };
+  // Removed: patientIdentity/matchesCurrentPatient (no longer needed for pure API, backend filters by auth user)
 
   const sortByRecentDate = (items) =>
     [...items].sort((a, b) => {
@@ -235,6 +205,28 @@ const PatientDashboard = ({ currentUser, logout }) => {
       const bDate = new Date(b.date || b.createdAt || b.timestamp || 0).getTime();
       return bDate - aDate;
     });
+
+  const normalizePrescription = (item) => ({
+    ...item,
+    doctor: item?.doctor?.username || item?.doctor || "Médecin",
+    patientName: item?.patient?.username || item?.patientName || "Patient",
+    medications: Array.isArray(item?.medications) ? item.medications : [],
+  });
+
+  const normalizeMedicalRecord = (record) => ({
+    ...record,
+    title: record?.title || "Document médical",
+    description: record?.description || "",
+    type: record?.type || "patient_note",
+  });
+
+  const normalizePayment = (payment) => ({
+    ...payment,
+    amount: Number(payment?.amount || 0),
+    status: payment?.status || "en_attente",
+    description: payment?.description || "",
+    date: payment?.date || payment?.createdAt || "",
+  });
 
   const [patientPrescriptions, setPatientPrescriptions] = useState([]);
   const [patientPayments, setPatientPayments] = useState([]);
@@ -250,45 +242,65 @@ const PatientDashboard = ({ currentUser, logout }) => {
     try {
       const resp = await axios.get(`${API_BASE_URL}/prescriptions`, { headers: tokenHeader() });
       const data = resp.data;
-      setPatientPrescriptions(sortByRecentDate(Array.isArray(data) ? data : []));
+      setPatientPrescriptions(sortByRecentDate(Array.isArray(data) ? data.map(normalizePrescription) : []));
     } catch (e) {
       console.error("fetch prescriptions failed", e);
-      const cached = readStorageArray(PRESCRIPTIONS_STORAGE_KEY).filter(matchesCurrentPatient);
-      setPatientPrescriptions(sortByRecentDate(cached));
+      toast.error("Erreur chargement ordonnances. Vérifiez le serveur backend.");
+      setPatientPrescriptions([]);
     }
   }
   async function loadPayments() {
     try {
       const resp = await axios.get(`${API_BASE_URL}/payments`, { headers: tokenHeader() });
-      setPatientPayments(sortByRecentDate(Array.isArray(resp.data) ? resp.data : []));
+      setPatientPayments(sortByRecentDate(Array.isArray(resp.data) ? resp.data.map(normalizePayment) : []));
     } catch (e) {
       console.error("fetch payments failed", e);
-      const cached = readStorageArray(PAYMENTS_STORAGE_KEY).filter(matchesCurrentPatient);
-      setPatientPayments(sortByRecentDate(cached));
+      toast.error("Erreur chargement paiements. Vérifiez le serveur backend.");
+      setPatientPayments([]);
     }
   }
   async function loadMedicalRecords() {
     try {
       const resp = await axios.get(`${API_BASE_URL}/medical-records`, { headers: tokenHeader() });
-      setPatientMedicalRecords(sortByRecentDate(Array.isArray(resp.data) ? resp.data : []));
+      setPatientMedicalRecords(sortByRecentDate(Array.isArray(resp.data) ? resp.data.map(normalizeMedicalRecord) : []));
     } catch (e) {
       console.error("fetch medical records failed", e);
-      const keys = ["patientMedicalRecords", "medicalRecords", "medecinMedicalRecords"];
-      const cached = keys.flatMap((k) => readStorageArray(k)).filter(matchesCurrentPatient);
-      setPatientMedicalRecords(sortByRecentDate(cached));
+      toast.error("Erreur chargement dossiers médicaux. Vérifiez le serveur backend.");
+      setPatientMedicalRecords([]);
     }
   }
 
   // crud operations used maybe later
   async function addMedicalRecord(body) {
-    const resp = await axios.post(`${API_BASE_URL}/medical-records`, body, { headers: { "Content-Type": "application/json", ...tokenHeader() } });
-    setPatientMedicalRecords((prev) => sortByRecentDate([resp.data, ...prev]));
+    const payload = {
+      date: body.date || new Date().toISOString().split("T")[0],
+      type: body.type || "patient_note",
+      title: body.title,
+      description: body.description || "",
+      symptoms: Array.isArray(body.symptoms) ? body.symptoms : [],
+      recommendations: Array.isArray(body.recommendations) ? body.recommendations : [],
+      medications: Array.isArray(body.medications) ? body.medications : [],
+    };
+    const resp = await axios.post(`${API_BASE_URL}/medical-records`, payload, { headers: { "Content-Type": "application/json", ...tokenHeader() } });
+    setPatientMedicalRecords((prev) => sortByRecentDate([normalizeMedicalRecord(resp.data), ...prev]));
     setDocumentsVersion((v) => v + 1);
     return resp.data;
   }
   async function updateMedicalRecord(id, body) {
-    const resp = await axios.put(`${API_BASE_URL}/medical-records/${id}`, body, { headers: { "Content-Type": "application/json", ...tokenHeader() } });
-    setPatientMedicalRecords((prev) => sortByRecentDate(prev.map((r) => (String(r.id) === String(id) ? resp.data : r))));
+    const currentRecord = patientMedicalRecords.find((record) => String(record.id) === String(id));
+    const payload = {
+      date: body.date || currentRecord?.date || new Date().toISOString().split("T")[0],
+      type: body.type || currentRecord?.type || "patient_note",
+      title: body.title || currentRecord?.title || "Document médical",
+      description: typeof body.description === "string" ? body.description : currentRecord?.description || "",
+      symptoms: Array.isArray(body.symptoms) ? body.symptoms : currentRecord?.symptoms || [],
+      recommendations: Array.isArray(body.recommendations) ? body.recommendations : currentRecord?.recommendations || [],
+      medications: Array.isArray(body.medications) ? body.medications : currentRecord?.medications || [],
+    };
+    const resp = await axios.put(`${API_BASE_URL}/medical-records/${id}`, payload, { headers: { "Content-Type": "application/json", ...tokenHeader() } });
+    setPatientMedicalRecords((prev) =>
+      sortByRecentDate(prev.map((r) => (String(r.id) === String(id) ? normalizeMedicalRecord(resp.data) : r)))
+    );
     setDocumentsVersion((v) => v + 1);
     return resp.data;
   }
@@ -299,13 +311,13 @@ const PatientDashboard = ({ currentUser, logout }) => {
   }
   async function addPayment(body) {
     const resp = await axios.post(`${API_BASE_URL}/payments`, body, { headers: { "Content-Type": "application/json", ...tokenHeader() } });
-    setPatientPayments((prev) => sortByRecentDate([resp.data, ...prev]));
+    setPatientPayments((prev) => sortByRecentDate([normalizePayment(resp.data), ...prev]));
     setDocumentsVersion((v) => v + 1);
     return resp.data;
   }
   async function updatePayment(id, body) {
     const resp = await axios.put(`${API_BASE_URL}/payments/${id}`, body, { headers: { "Content-Type": "application/json", ...tokenHeader() } });
-    setPatientPayments((prev) => sortByRecentDate(prev.map((p) => (String(p.id) === String(id) ? resp.data : p))));
+    setPatientPayments((prev) => sortByRecentDate(prev.map((p) => (String(p.id) === String(id) ? normalizePayment(resp.data) : p))));
     setDocumentsVersion((v) => v + 1);
     return resp.data;
   }
@@ -319,25 +331,9 @@ const PatientDashboard = ({ currentUser, logout }) => {
     loadPrescriptions();
     loadPayments();
     loadMedicalRecords();
-  }, [patientIdentity, documentsVersion]);
+  }, [documentsVersion]);
 
-  const patientSportActivities = useMemo(() => {
-    const activities = readStorageArray(PATIENT_SPORTS_ACTIVITY_STORAGE_KEY);
-    const filtered = activities.filter((item) => {
-      if (!item || typeof item !== "object") return false;
-
-      const userId = String(item.userId || "").trim();
-      const userEmail = normalizeText(item.userEmail);
-      const userName = normalizeText(item.userName);
-
-      if (patientIdentity.id && userId && patientIdentity.id === userId) return true;
-      if (patientIdentity.email && userEmail && patientIdentity.email === userEmail) return true;
-      if (userName && patientIdentity.names.some((name) => name && (userName.includes(name) || name.includes(userName)))) return true;
-      return false;
-    });
-
-    return sortByRecentDate(filtered).slice(0, 80);
-  }, [patientIdentity, sportsVersion]);
+  const patientSportActivities = useMemo(() => [], []); // Sports localStorage unchanged (out of scope)
 
   // Helper function to get JWT token from localStorage
   const getToken = () => localStorage.getItem("token");
@@ -415,7 +411,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
         if (response.status === 401 || response.status === 403) {
           localStorage.removeItem("token");
           logout?.();
-          toast.error("Session expirÃƒÂ©e. Veuillez vous reconnecter.");
+          toast.error("Session expirée. Veuillez vous reconnecter.");
         }
         throw new Error("Failed to fetch profile");
       }
@@ -432,7 +428,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
       return updatedProfile;
     } catch (error) {
       console.error("Error fetching profile:", error);
-      toast.error("Erreur lors de la rÃƒÂ©cupÃƒÂ©ration du profil.");
+      toast.error("Erreur lors de la récupération du profil.");
       return null;
     }
   };
@@ -449,7 +445,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
         if (response.status === 401 || response.status === 403) {
           localStorage.removeItem("token");
           logout?.();
-          toast.error("Session expirÃƒÂ©e. Veuillez vous reconnecter.");
+          toast.error("Session expirée. Veuillez vous reconnecter.");
         }
         throw new Error("Failed to fetch appointments");
       }
@@ -466,13 +462,13 @@ const PatientDashboard = ({ currentUser, logout }) => {
         appointments
           .filter((rdv) => rdv.isNew)
           .forEach((rdv) => {
-            toast.success(`Rendez-vous en attente : ${rdv.specialite || "Consultation"} le ${rdv.date} ÃƒÂ  ${rdv.time}`);
+            toast.success(`Rendez-vous en attente : ${rdv.specialite || "Consultation"} le ${rdv.date} à ${rdv.time}`);
           });
       }
     } catch (error) {
       console.error("Error fetching appointments:", error);
       if (!silent) {
-        toast.error("Erreur lors de la rÃƒÂ©cupÃƒÂ©ration des rendez-vous.");
+        toast.error("Erreur lors de la récupération des rendez-vous.");
       }
     }
   };
@@ -489,7 +485,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
         if (response.status === 401 || response.status === 403) {
           localStorage.removeItem("token");
           logout?.();
-          toast.error("Session expirÃƒÂ©e. Veuillez vous reconnecter.");
+          toast.error("Session expirée. Veuillez vous reconnecter.");
         }
         throw new Error("Failed to fetch available slots");
       }
@@ -497,7 +493,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
       setAvailableSlots(slots);
     } catch (error) {
       console.error("Error fetching available slots:", error);
-      toast.error("Erreur lors de la rÃƒÂ©cupÃƒÂ©ration des crÃƒÂ©neaux disponibles.");
+      toast.error("Erreur lors de la récupération des créneaux disponibles.");
     }
   };
 
@@ -535,28 +531,15 @@ const PatientDashboard = ({ currentUser, logout }) => {
     return () => clearInterval(intervalId);
   }, [secondaryView]);
 
-  useEffect(() => {
-    const onStorage = (event) => {
-      if (!event.key) return;
-      if ([PRESCRIPTIONS_STORAGE_KEY, PAYMENTS_STORAGE_KEY, PATIENT_SPORTS_ACTIVITY_STORAGE_KEY, PATIENT_ACTIVITY_STORAGE_KEY].includes(event.key)) {
-        setDocumentsVersion((prev) => prev + 1);
-        setSportsVersion((prev) => prev + 1);
-        setHistoryVersion((prev) => prev + 1);
-        setLastPatientStatsRefresh(new Date().toISOString());
-      }
-    };
-
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
+  // Removed storage listener (no localStorage for core data)
 
   const handleAddRdv = async () => {
     if (!selectedSpecialtyObj && !selectedSpecialty) {
-      toast.error("Veuillez choisir une spÃƒÂ©cialitÃƒÂ©.", { description: "Champs requis" });
+      toast.error("Veuillez choisir une spécialité.", { description: "Champs requis" });
       return;
     }
     if (!selectedDate) {
-      toast.error("Veuillez sÃƒÂ©lectionner une date.", { description: "Champs requis" });
+      toast.error("Veuillez sélectionner une date.", { description: "Champs requis" });
       return;
     }
     if (!selectedTime) {
@@ -589,7 +572,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
         if (response.status === 401 || response.status === 403) {
           localStorage.removeItem("token");
           logout?.();
-          toast.error("Session expirÃƒÂ©e. Veuillez vous reconnecter.");
+          toast.error("Session expirée. Veuillez vous reconnecter.");
         }
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to add appointment");
@@ -605,18 +588,18 @@ const PatientDashboard = ({ currentUser, logout }) => {
         isNew: newRdv.is_new || newRdv.isNew,
       }]);
 
-      toast.success("Rendez-vous ajoutÃƒÂ© avec succÃƒÂ¨s", {
-        description: `${newRdv.specialite || "Consultation"} Ã¢â‚¬â€ ${new Date(newRdv.date).toLocaleDateString("fr-FR", {
+      toast.success("Rendez-vous ajouté avec succès", {
+        description: `${newRdv.specialite || "Consultation"}  -  ${new Date(newRdv.date).toLocaleDateString("fr-FR", {
           weekday: "long",
           year: "numeric",
           month: "long",
           day: "numeric",
-        })} ÃƒÂ  ${newRdv.time}${demande ? `\nMotif: ${demande}` : ""}`,
+        })} à ${newRdv.time}${demande ? `\nMotif: ${demande}` : ""}`,
       });
 
       await addToHistory(
         "Ajout rendez-vous",
-        `Ajout d'un rendez-vous: ${newRdv.specialite} le ${newRdv.date} ÃƒÂ  ${newRdv.time}`
+        `Ajout d'un rendez-vous: ${newRdv.specialite} le ${newRdv.date} à ${newRdv.time}`
       );
 
       setIsModalOpen(false);
@@ -650,7 +633,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
         if (response.status === 401 || response.status === 403) {
           localStorage.removeItem("token");
           logout?.();
-          toast.error("Session expirÃƒÂ©e. Veuillez vous reconnecter.");
+          toast.error("Session expirée. Veuillez vous reconnecter.");
         }
         throw new Error("Failed to cancel appointment");
       }
@@ -658,9 +641,9 @@ const PatientDashboard = ({ currentUser, logout }) => {
       setRendezVous((prev) => prev.filter((rdv) => rdv.id !== rdvId));
       await addToHistory(
         "Annulation rendez-vous",
-        `Annulation du rendez-vous: ${rdvToCancel.specialite} le ${rdvToCancel.date} ÃƒÂ  ${rdvToCancel.time}`
+        `Annulation du rendez-vous: ${rdvToCancel.specialite} le ${rdvToCancel.date} à ${rdvToCancel.time}`
       );
-      toast.success("Rendez-vous annulÃƒÂ© avec succÃƒÂ¨s", { description: "Annulation confirmÃƒÂ©e" });
+      toast.success("Rendez-vous annulé avec succès", { description: "Annulation confirmée" });
     } catch (error) {
       console.error("Error canceling appointment:", error);
       toast.error("Erreur lors de l'annulation du rendez-vous.");
@@ -678,7 +661,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
 
   const handleSaveProfile = async () => {
     if (!editProfile.nom || !editProfile.prenom || !editProfile.email) {
-      toast.error("Veuillez remplir tous les champs obligatoires (Nom, PrÃƒÂ©nom, Email).");
+      toast.error("Veuillez remplir tous les champs obligatoires (Nom, Prénom, Email).");
       return;
     }
 
@@ -702,7 +685,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
         if (response.status === 401 || response.status === 403) {
           localStorage.removeItem("token");
           logout?.();
-          toast.error("Session expirÃƒÂ©e. Veuillez vous reconnecter.");
+          toast.error("Session expirée. Veuillez vous reconnecter.");
         }
         throw new Error("Failed to update profile");
       }
@@ -718,8 +701,8 @@ const PatientDashboard = ({ currentUser, logout }) => {
       };
       setProfile(updatedProfile);
       setEditProfile(null);
-      await addToHistory("Modification profil", "Mise ÃƒÂ  jour des informations du profil");
-      toast.success("Profil mis ÃƒÂ  jour avec succÃƒÂ¨s !");
+      await addToHistory("Modification profil", "Mise à jour des informations du profil");
+      toast.success("Profil mis à jour avec succès !");
     } catch (error) {
       console.error("Error updating profile:", error);
       toast.error("Erreur lors de la sauvegarde du profil.");
@@ -733,14 +716,14 @@ const PatientDashboard = ({ currentUser, logout }) => {
   const navigateTo = (view) => {
     setSecondaryView(view);
     setIsSidebarOpen(false);
-    addToHistory("Navigation", `AccÃƒÂ¨s ÃƒÂ  la vue ${view}`);
+    addToHistory("Navigation", `Accès à la vue ${view}`);
   };
 
   const handleLogout = async () => {
-    await addToHistory("DÃƒÂ©connexion", "DÃƒÂ©connexion du tableau de bord patient");
+    await addToHistory("Déconnexion", "Déconnexion du tableau de bord patient");
     localStorage.removeItem("token");
     logout?.();
-    toast.success("DÃƒÂ©connexion rÃƒÂ©ussie", { description: "Vous avez ÃƒÂ©tÃƒÂ© dÃƒÂ©connectÃƒÂ©." });
+    toast.success("Déconnexion rÃ©ussie", { description: "Vous avez été déconnecté." });
   };
 
   const isDateOnOrAfterToday = (dateStr) => {
@@ -899,7 +882,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
               secondaryView === "accueil" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white" : "text-gray-700"
             } hover:bg-gradient-to-r hover:from-cyan-600 hover:to-blue-700 hover:text-white transition-all duration-300`}
             onClick={() => navigateTo("accueil")}
-            aria-label="Aller ÃƒÂ  la page d'accueil"
+            aria-label="Aller à la page d'accueil"
             aria-current={secondaryView === "accueil" ? "page" : undefined}
           >
             <Home className="w-5 h-5" />
@@ -945,18 +928,6 @@ const PatientDashboard = ({ currentUser, logout }) => {
             Mes documents
           </Button>
           <Button
-            variant={secondaryView === "teleconsultation" ? "default" : "ghost"}
-            className={`w-full justify-start gap-2 rounded-xl ${
-              secondaryView === "teleconsultation" ? "bg-gradient-to-r from-sky-500 to-cyan-600 text-white" : "text-gray-700"
-            } hover:bg-gradient-to-r hover:from-sky-600 hover:to-cyan-700 hover:text-white transition-all duration-300`}
-            onClick={() => navigateTo("teleconsultation")}
-            aria-label="Ouvrir l'onglet teleconsultation"
-            aria-current={secondaryView === "teleconsultation" ? "page" : undefined}
-          >
-            <Video className="w-5 h-5" />
-            Teleconsultation
-          </Button>
-          <Button
             variant={secondaryView === "statsPatient" ? "default" : "ghost"}
             className={`w-full justify-start gap-2 rounded-xl ${
               secondaryView === "statsPatient" ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white" : "text-gray-700"
@@ -967,18 +938,6 @@ const PatientDashboard = ({ currentUser, logout }) => {
           >
             <BarChart3 className="w-5 h-5" />
             Statistiques
-          </Button>
-          <Button
-            variant={secondaryView === "activites" ? "default" : "ghost"}
-            className={`w-full justify-start gap-2 rounded-xl ${
-              secondaryView === "activites" ? "bg-gradient-to-r from-rose-500 to-pink-600 text-white" : "text-gray-700"
-            } hover:bg-gradient-to-r hover:from-rose-600 hover:to-pink-700 hover:text-white transition-all duration-300`}
-            onClick={() => navigateTo("activites")}
-            aria-label="Voir les activites sportives pratiquees"
-            aria-current={secondaryView === "activites" ? "page" : undefined}
-          >
-            <Activity className="w-5 h-5" />
-            Activites sportives
           </Button>
           <Button
             variant={secondaryView === "messagerie" ? "default" : "ghost"}
@@ -1024,7 +983,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
           variant="ghost"
           className="p-2 rounded-full text-gray-700 hover:bg-gradient-to-r hover:from-red-500 hover:to-pink-600 hover:text-white transition-all duration-200"
           onClick={handleLogout}
-          aria-label="Se dÃƒÂ©connecter"
+          aria-label="Se déconnecter"
         >
           <LogOut className="w-6 h-6" />
         </Button>
@@ -1063,13 +1022,13 @@ const PatientDashboard = ({ currentUser, logout }) => {
           <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-white/30 p-6">
             <h3 className="flex items-center gap-3 text-primary font-semibold text-lg mb-4">
               <FileText className="w-6 h-6" />
-              RÃƒÂ©capitulatif d'utilisation
+              Récapitulatif d'utilisation
             </h3>
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Prochains rendez-vous</h4>
                 {upcomingAppointments.length === 0 ? (
-                  <p className="text-sm text-gray-500">Aucun rendez-vous ÃƒÂ  venir</p>
+                  <p className="text-sm text-gray-500">Aucun rendez-vous à venir</p>
                 ) : (
                   <ul className="space-y-2">
                     {upcomingAppointments.map((rdv) => (
@@ -1080,7 +1039,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                           day: "numeric",
                           month: "short",
                         })}{" "}
-                        ÃƒÂ  {rdv.time}
+                        ? {rdv.time}
                       </li>
                     ))}
                   </ul>
@@ -1095,7 +1054,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                 </Button>
               </div>
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">ComplÃƒÂ©tion du profil</h4>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Complétion du profil</h4>
                 <div className="w-full bg-gray-200 rounded-full h-2.5">
                   <div
                     className="bg-gradient-to-r from-cyan-500 to-blue-600 h-2.5 rounded-full"
@@ -1103,15 +1062,15 @@ const PatientDashboard = ({ currentUser, logout }) => {
                   ></div>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
-                  Profil complÃƒÂ©tÃƒÂ© ÃƒÂ  {profileCompletion}%{' '}
+                  Profil complété à {profileCompletion}%{' '}
                   {profileCompletion < 100 && (
                     <Button
                       variant="link"
                       className="text-blue-600 hover:text-blue-700 p-0"
                       onClick={() => navigateTo("profil")}
-                      aria-label="ComplÃƒÂ©ter votre profil"
+                      aria-label="Compléter votre profil"
                     >
-                      ComplÃƒÂ©ter votre profil
+                      Compléter votre profil
                     </Button>
                   )}
                 </p>
@@ -1122,7 +1081,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
           <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-white/30 p-6">
             <h3 className="flex items-center gap-3 text-primary font-semibold text-lg mb-4">
               <Heart className="w-6 h-6" />
-              Conseils santÃƒÂ©
+              Conseils santé
             </h3>
             <div className="grid md:grid-cols-2 gap-4">
               {healthTips.map((tip) => {
@@ -1156,7 +1115,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
         {rendezVous.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <Calendar className="w-16 h-16 mx-auto mb-4" />
-            <p>Aucun rendez-vous enregistrÃƒÂ©</p>
+            <p>Aucun rendez-vous enregistré</p>
             <Button
               className="mt-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white px-8 py-4 rounded-xl"
               onClick={() => {
@@ -1178,7 +1137,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                   <tr>
                     <th className="border border-white/30 p-3 text-left text-sm font-medium text-gray-700">Date</th>
                     <th className="border border-white/30 p-3 text-left text-sm font-medium text-gray-700">Heure</th>
-                    <th className="border border-white/30 p-3 text-left text-sm font-medium text-gray-700">SpÃƒÂ©cialitÃƒÂ©</th>
+                    <th className="border border-white/30 p-3 text-left text-sm font-medium text-gray-700">Spécialité</th>
                     <th className="border border-white/30 p-3 text-left text-sm font-medium text-gray-700">Motif</th>
                     <th className="border border-white/30 p-3 text-left text-sm font-medium text-gray-700">Statut RDV</th>
                   </tr>
@@ -1196,7 +1155,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                       </td>
                       <td className="border border-white/30 p-3 text-sm text-gray-500">{rdv.time}</td>
                       <td className="border border-white/30 p-3 text-sm text-gray-500">{rdv.specialite}</td>
-                      <td className="border border-white/30 p-3 text-sm text-gray-500">{rdv.demande || "Non spÃƒÂ©cifiÃƒÂ©"}</td>
+                      <td className="border border-white/30 p-3 text-sm text-gray-500">{rdv.demande || "Non spécifié"}</td>
                       <td className="border border-white/30 p-3 text-sm">
                         <div className="flex flex-col gap-1">
                           {rdv.status === "en attente" && (
@@ -1204,21 +1163,21 @@ const PatientDashboard = ({ currentUser, logout }) => {
                               En attente
                             </span>
                           )}
-                          {rdv.status === "confirmÃƒÂ©" && (
+                          {rdv.status === "confirmé" && (
                             <span className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full font-medium">
-                              ConfirmÃƒÂ©
+                              Confirm?
                             </span>
                           )}
-                          {(rdv.status === "terminÃƒÂ©" || !isDateOnOrAfterToday(rdv.date)) && (
+                          {(rdv.status === "terminé" || !isDateOnOrAfterToday(rdv.date)) && (
                             <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                              rdv.status === "terminÃƒÂ©" ? "text-green-600 bg-green-50" : "text-gray-600 bg-gray-50"
+                              rdv.status === "terminé" ? "text-green-600 bg-green-50" : "text-gray-600 bg-gray-50"
                             }`}>
-                              {rdv.status === "terminÃƒÂ©" ? "TerminÃƒÂ©" : "PassÃƒÂ©"}
+                              {rdv.status === "terminé" ? "TerminÃ©" : "Passé"}
                             </span>
                           )}
-                          {(!rdv.status || rdv.status === "ÃƒÂ  venir") && isDateOnOrAfterToday(rdv.date) && (
+                          {(!rdv.status || rdv.status === "à venir") && isDateOnOrAfterToday(rdv.date) && (
                             <span className="px-3 py-1 text-xs bg-green-100 text-green-800 rounded-full font-medium">
-                              Ãƒâ‚¬ venir
+                              à venir
                             </span>
                           )}
                         </div>
@@ -1230,7 +1189,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                             variant="outline"
                             onClick={() => handleCancelRdv(rdv.id)}
                             className="rounded-xl border-gray-200 text-gray-700 hover:bg-gradient-to-r hover:from-red-500 hover:to-pink-600 hover:text-white"
-                            aria-label={`Annuler le rendez-vous du ${new Date(rdv.date).toLocaleDateString("fr-FR")} ÃƒÂ  ${
+                            aria-label={`Annuler le rendez-vous du ${new Date(rdv.date).toLocaleDateString("fr-FR")} ? ${
                               rdv.time
                             }`}
                           >
@@ -1268,12 +1227,12 @@ const PatientDashboard = ({ currentUser, logout }) => {
                       <p className="text-sm text-gray-500">{rdv.time}</p>
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-700">SpÃƒÂ©cialitÃƒÂ©:</span>
+                      <span className="text-sm font-medium text-gray-700">Spécialité:</span>
                       <p className="text-sm text-gray-500">{rdv.specialite}</p>
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-700">Motif:</span>
-                      <p className="text-sm text-gray-500">{rdv.demande || "Non spÃƒÂ©cifiÃƒÂ©"}</p>
+                      <p className="text-sm text-gray-500">{rdv.demande || "Non spécifié"}</p>
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-700">Statut:</span>
@@ -1283,21 +1242,21 @@ const PatientDashboard = ({ currentUser, logout }) => {
                             En attente
                           </span>
                         )}
-                        {rdv.status === "confirmÃƒÂ©" && (
+                        {rdv.status === "confirmé" && (
                           <span className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full font-medium">
-                            ConfirmÃƒÂ©
+                            Confirm?
                           </span>
                         )}
-                        {(rdv.status === "terminÃƒÂ©" || !isDateOnOrAfterToday(rdv.date)) && (
+                        {(rdv.status === "terminé" || !isDateOnOrAfterToday(rdv.date)) && (
                           <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                            rdv.status === "terminÃƒÂ©" ? "text-green-600 bg-green-50" : "text-gray-600 bg-gray-50"
+                            rdv.status === "terminé" ? "text-green-600 bg-green-50" : "text-gray-600 bg-gray-50"
                           }`}>
-                            {rdv.status === "terminÃƒÂ©" ? "TerminÃƒÂ©" : "PassÃƒÂ©"}
+                            {rdv.status === "terminé" ? "TerminÃ©" : "Passé"}
                           </span>
                         )}
-                        {(!rdv.status || rdv.status === "ÃƒÂ  venir") && isDateOnOrAfterToday(rdv.date) && (
+                        {(!rdv.status || rdv.status === "à venir") && isDateOnOrAfterToday(rdv.date) && (
                           <span className="px-3 py-1 text-xs bg-green-100 text-green-800 rounded-full font-medium">
-                            Ãƒâ‚¬ venir
+                            à venir
                           </span>
                         )}
                       </div>
@@ -1309,7 +1268,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                           variant="outline"
                           onClick={() => handleCancelRdv(rdv.id)}
                           className="w-full rounded-xl border-gray-200 text-gray-700 hover:bg-gradient-to-r hover:from-red-500 hover:to-pink-600 hover:text-white"
-                          aria-label={`Annuler le rendez-vous du ${new Date(rdv.date).toLocaleDateString("fr-FR")} ÃƒÂ  ${
+                          aria-label={`Annuler le rendez-vous du ${new Date(rdv.date).toLocaleDateString("fr-FR")} ? ${
                             rdv.time
                           }`}
                         >
@@ -1412,13 +1371,13 @@ const PatientDashboard = ({ currentUser, logout }) => {
                 ) : (
                   patientPrescriptions.map((item) => (
                     <div key={item.id || `${item.date}-${item.createdAt}`} className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
-                      <p className="font-medium text-gray-700">{item.doctor || "Medecin"} - {item.date ? new Date(item.date).toLocaleDateString("fr-FR") : "Date non definie"}</p>
+                      <p className="font-medium text-gray-700">{item.doctor || "Médecin"} - {item.date ? new Date(item.date).toLocaleDateString("fr-FR") : "Date non définie"}</p>
                       <p className="text-sm text-gray-600 mt-1">
-                        Medicaments: {Array.isArray(item.medications) ? item.medications.length : 0}
+                        Médicaments: {Array.isArray(item.medications) ? item.medications.length : 0}
                       </p>
                       <p className="text-sm text-gray-600">Instructions: {item.instructions || "Aucune instruction"}</p>
                       <p className="text-xs text-gray-500 mt-2">
-                        {item.sentAt ? `Envoyee le ${new Date(item.sentAt).toLocaleString("fr-FR")}` : "Non marquee comme envoyee"}
+                        {item.sentAt ? `Envoyée le ${new Date(item.sentAt).toLocaleString("fr-FR")}` : "Non marquée comme envoyée"}
                       </p>
                     </div>
                   ))
@@ -1436,10 +1395,10 @@ const PatientDashboard = ({ currentUser, logout }) => {
                     if (!docForm.title.trim()) return;
                     try {
                       if (editingDocId) {
-                        await updateMedicalRecord(editingDocId, { title: docForm.title, description: docForm.description, date: docForm.date });
+                        await updateMedicalRecord(editingDocId, { title: docForm.title, description: docForm.description, date: docForm.date, type: "patient_note" });
                         toast.success('Document mis à jour');
                       } else {
-                        await addMedicalRecord({ title: docForm.title, description: docForm.description, date: docForm.date });
+                        await addMedicalRecord({ title: docForm.title, description: docForm.description, date: docForm.date, type: "patient_note" });
                         toast.success('Document ajouté');
                       }
                       setDocForm({ title: "", description: "", date: "" });
@@ -1468,11 +1427,52 @@ const PatientDashboard = ({ currentUser, logout }) => {
                   <div className="space-y-3">
                     {patientMedicalRecords.map((record, index) => (
                       <div key={record.id || `record-${index}`} className="rounded-xl border border-cyan-100 bg-cyan-50/50 p-4">
-                        <p className="font-medium text-gray-700">{record.title || record.type || "Compte-rendu medical"}</p>
-                        <p className="text-sm text-gray-600 mt-1">{record.description || record.notes || "Aucun detail."}</p>
-                        <p className="text-xs text-gray-500 mt-2">
-                          {record.date ? new Date(record.date).toLocaleDateString("fr-FR") : "Date non definie"}
-                        </p>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="font-medium text-gray-700">{record.title || record.type || "Compte-rendu médical"}</p>
+                            <p className="text-sm text-gray-600 mt-1">{record.description || record.notes || "Aucun détail."}</p>
+                            <p className="text-xs text-gray-500 mt-2">
+                              {record.date ? new Date(record.date).toLocaleDateString("fr-FR") : "Date non définie"}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              className="rounded-xl"
+                              onClick={() => {
+                                setEditingDocId(record.id);
+                                setDocForm({
+                                  title: record.title || "",
+                                  description: record.description || "",
+                                  date: record.date || "",
+                                });
+                              }}
+                            >
+                              Modifier
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="rounded-xl border-red-200 text-red-700 hover:bg-red-50"
+                              onClick={async () => {
+                                if (!window.confirm("Supprimer ce document ?")) return;
+                                try {
+                                  await deleteMedicalRecord(record.id);
+                                  if (editingDocId === record.id) {
+                                    setEditingDocId(null);
+                                    setDocForm({ title: "", description: "", date: "" });
+                                  }
+                                  toast.success("Document supprimé");
+                                } catch (error) {
+                                  console.error(error);
+                                  toast.error("Erreur suppression");
+                                }
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Supprimer
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1482,6 +1482,57 @@ const PatientDashboard = ({ currentUser, logout }) => {
 
             {activeDocumentCard === "paiements" && (
               <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Montant"
+                    value={paymentForm.amount}
+                    onChange={(e) => setPaymentForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Description"
+                    value={paymentForm.description}
+                    onChange={(e) => setPaymentForm((prev) => ({ ...prev, description: e.target.value }))}
+                  />
+                  <select
+                    value={paymentForm.status}
+                    onChange={(e) => setPaymentForm((prev) => ({ ...prev, status: e.target.value }))}
+                    className="rounded-xl border border-gray-200 px-3 py-2"
+                  >
+                    <option value="en_attente">En attente</option>
+                    <option value="paye">Payé</option>
+                    <option value="annule">Annulé</option>
+                  </select>
+                  <Button
+                    onClick={async () => {
+                      if (!String(paymentForm.amount).trim()) return;
+                      try {
+                        const payload = {
+                          amount: Number(paymentForm.amount),
+                          description: paymentForm.description,
+                          status: paymentForm.status,
+                        };
+                        if (editingPaymentId) {
+                          await updatePayment(editingPaymentId, payload);
+                          toast.success("Paiement mis à jour");
+                        } else {
+                          await addPayment(payload);
+                          toast.success("Paiement ajouté");
+                        }
+                        setPaymentForm({ amount: "", description: "", status: "en_attente" });
+                        setEditingPaymentId(null);
+                      } catch (error) {
+                        console.error(error);
+                        toast.error("Erreur sauvegarde paiement");
+                      }
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {editingPaymentId ? "Modifier" : "Ajouter"}
+                  </Button>
+                </div>
                 {patientPayments.length === 0 ? (
                   <p className="text-sm text-gray-500">Aucun paiement enregistre pour le moment.</p>
                 ) : (
@@ -1500,12 +1551,47 @@ const PatientDashboard = ({ currentUser, logout }) => {
                           <p className="font-medium text-gray-700">{Number(payment.amount || 0).toLocaleString("fr-FR")} Ar</p>
                           <Badge className={statusClass}>{statusLabel}</Badge>
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {payment.reference || "Ref non definie"} - {payment.method || "methode non definie"}
-                        </p>
+                        <p className="text-sm text-gray-600 mt-1">{payment.description || "Aucune description"}</p>
                         <p className="text-xs text-gray-500 mt-1">
-                          {payment.date ? new Date(payment.date).toLocaleDateString("fr-FR") : "Date non definie"}
+                          {payment.date ? new Date(payment.date).toLocaleDateString("fr-FR") : "Date non définie"}
                         </p>
+                        <div className="mt-3 flex gap-2">
+                          <Button
+                            variant="outline"
+                            className="rounded-xl"
+                            onClick={() => {
+                              setEditingPaymentId(payment.id);
+                              setPaymentForm({
+                                amount: String(payment.amount || ""),
+                                description: payment.description || "",
+                                status: payment.status || "en_attente",
+                              });
+                            }}
+                          >
+                            Modifier
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="rounded-xl border-red-200 text-red-700 hover:bg-red-50"
+                            onClick={async () => {
+                              if (!window.confirm("Supprimer ce paiement ?")) return;
+                              try {
+                                await deletePayment(payment.id);
+                                if (editingPaymentId === payment.id) {
+                                  setEditingPaymentId(null);
+                                  setPaymentForm({ amount: "", description: "", status: "en_attente" });
+                                }
+                                toast.success("Paiement supprimé");
+                              } catch (error) {
+                                console.error(error);
+                                toast.error("Erreur suppression paiement");
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Supprimer
+                          </Button>
+                        </div>
                       </div>
                     );
                   })
@@ -1837,7 +1923,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                     />
                   </div>
                   <div>
-                    <Label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="prenom">PrÃƒÂ©nom</Label>
+                    <Label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="prenom">Prénom</Label>
                     <Input
                       id="prenom"
                       name="prenom"
@@ -1863,18 +1949,18 @@ const PatientDashboard = ({ currentUser, logout }) => {
                 <>
                   <div>
                     <Label className="block text-sm font-medium text-gray-700 mb-2">Nom</Label>
-                    <p className="text-sm text-gray-500">{profile.nom || "Non dÃƒÂ©fini"}</p>
+                    <p className="text-sm text-gray-500">{profile.nom || "Non défini"}</p>
                   </div>
                   <div>
-                    <Label className="block text-sm font-medium text-gray-700 mb-2">PrÃƒÂ©nom</Label>
-                    <p className="text-sm text-gray-500">{profile.prenom || "Non dÃƒÂ©fini"}</p>
+                    <Label className="block text-sm font-medium text-gray-700 mb-2">Prénom</Label>
+                    <p className="text-sm text-gray-500">{profile.prenom || "Non défini"}</p>
                   </div>
                   <div>
                     <Label className="block text-sm font-medium text-gray-700 mb-2">Date de naissance</Label>
                     <p className="text-sm text-gray-500">
                       {profile.dateNaissance
                         ? new Date(profile.dateNaissance).toLocaleDateString("fr-FR")
-                        : "Non dÃƒÂ©fini"}
+                        : "Non défini"}
                     </p>
                   </div>
                 </>
@@ -1902,7 +1988,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                     />
                   </div>
                   <div>
-                    <Label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="telephone">TÃ©lÃ©phone</Label>
+                    <Label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="telephone">Téléphone</Label>
                     <Input
                       id="telephone"
                       name="telephone"
@@ -1927,15 +2013,15 @@ const PatientDashboard = ({ currentUser, logout }) => {
                 <>
                   <div>
                     <Label className="block text-sm font-medium text-gray-700 mb-2">Email</Label>
-                    <p className="text-sm text-gray-500">{profile.email || "Non dÃƒÂ©fini"}</p>
+                    <p className="text-sm text-gray-500">{profile.email || "Non défini"}</p>
                   </div>
                   <div>
-                    <Label className="block text-sm font-medium text-gray-700 mb-2">TÃ©lÃ©phone</Label>
-                    <p className="text-sm text-gray-500">{profile.telephone || "Non dÃƒÂ©fini"}</p>
+                    <Label className="block text-sm font-medium text-gray-700 mb-2">Téléphone</Label>
+                    <p className="text-sm text-gray-500">{profile.telephone || "Non défini"}</p>
                   </div>
                   <div>
                     <Label className="block text-sm font-medium text-gray-700 mb-2">Adresse</Label>
-                    <p className="text-sm text-gray-500">{profile.adresse || "Non dÃƒÂ©fini"}</p>
+                    <p className="text-sm text-gray-500">{profile.adresse || "Non défini"}</p>
                   </div>
                 </>
               )}
@@ -1979,13 +2065,13 @@ const PatientDashboard = ({ currentUser, logout }) => {
     const validateStep = (step) => {
       const newErrors = {};
       if (step === 1 && !selectedSpecialtyObj) {
-        newErrors.specialty = "Veuillez sÃƒÂ©lectionner une spÃƒÂ©cialitÃƒÂ©.";
+        newErrors.specialty = "Veuillez sélectionner une spécialité.";
       }
       if (step === 2 && !selectedDate) {
-        newErrors.date = "Veuillez sÃƒÂ©lectionner une date.";
+        newErrors.date = "Veuillez sélectionner une date.";
       }
       if (step === 2 && !selectedTime) {
-        newErrors.time = "Veuillez sÃƒÂ©lectionner une heure.";
+        newErrors.time = "Veuillez sélectionner une heure.";
       }
       setErrors(newErrors);
       return Object.keys(newErrors).length === 0;
@@ -2007,7 +2093,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
               setAvailableSlots([]);
             }}
             className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-full p-1"
-            aria-label="Fermer la fenÃƒÂªtre de prise de rendez-vous"
+            aria-label="Fermer la fenêtre de prise de rendez-vous"
           >
             <XIcon className="w-6 h-6" />
           </button>
@@ -2019,7 +2105,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
           </div>
           <div className="mt-6 flex justify-center gap-4">
             <span className={`text-sm font-medium ${bookingStep === 1 ? "text-blue-600" : "text-gray-400"}`}>
-              1. SpÃƒÂ©cialitÃƒÂ©
+              1. Spécialité
             </span>
             <span className={`text-sm font-medium ${bookingStep === 2 ? "text-blue-600" : "text-gray-400"}`}>
               2. Date et heure
@@ -2031,7 +2117,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
           {bookingStep === 1 && (
             <div className="space-y-6 mt-6">
               <h4 className="font-semibold text-lg text-gray-700">
-                Choisissez une spÃƒÂ©cialitÃƒÂ©
+                Choisissez une spécialité
               </h4>
               <div className="relative">
                 <Input
@@ -2039,19 +2125,19 @@ const PatientDashboard = ({ currentUser, logout }) => {
                   value={specialtySearch}
                   onChange={(e) => setSpecialtySearch(e.target.value)}
                   onFocus={() => setIsSpecialtyDropdownOpen(true)}
-                  placeholder="Rechercher une spÃƒÂ©cialitÃƒÂ©..."
+                  placeholder="Rechercher une spécialité..."
                   className="w-full rounded-xl px-4 py-3 pl-10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  aria-label="Rechercher une spÃƒÂ©cialitÃƒÂ©"
+                  aria-label="Rechercher une spécialité"
                 />
                 <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 {isSpecialtyDropdownOpen && (
                   <div className="absolute z-50 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-200 max-h-64 overflow-y-auto">
                     {specialtiesLoading ? (
-                      <p className="p-4 text-gray-500 text-center">Chargement des spÃƒÂ©cialitÃƒÂ©s...</p>
+                      <p className="p-4 text-gray-500 text-center">Chargement des spécialités...</p>
                     ) : specialtiesError ? (
-                      <p className="p-4 text-red-500 text-center">Erreur lors du chargement des spÃƒÂ©cialitÃƒÂ©s</p>
+                      <p className="p-4 text-red-500 text-center">Erreur lors du chargement des spécialités</p>
                     ) : filteredSpecialties.length === 0 ? (
-                      <p className="p-4 text-gray-500 text-center">Aucune spÃƒÂ©cialitÃƒÂ© trouvÃƒÂ©e</p>
+                      <p className="p-4 text-gray-500 text-center">Aucune spécialité trouvée</p>
                     ) : (
                       filteredSpecialties.map((specialty) => {
                         const IconComponent = specialty.icon;
@@ -2063,7 +2149,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                               setSpecialtySearch(specialty.name);
                               setIsSpecialtyDropdownOpen(false);
                               setBookingStep(2);
-                              addToHistory("SÃƒÂ©lection spÃƒÂ©cialitÃƒÂ©", `SÃƒÂ©lection de la spÃƒÂ©cialitÃƒÂ©: ${specialty.name}`);
+                              addToHistory("Sélection spécialité", `Sélection de la spécialité: ${specialty.name}`);
                             }}
                             className="cursor-pointer p-4 hover:bg-blue-50 transition-all duration-200 flex items-center gap-3"
                             tabIndex={0}
@@ -2073,7 +2159,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                                 setSpecialtySearch(specialty.name);
                                 setIsSpecialtyDropdownOpen(false);
                                 setBookingStep(2);
-                                addToHistory("SÃƒÂ©lection spÃƒÂ©cialitÃƒÂ©", `SÃƒÂ©lection de la spÃƒÂ©cialitÃƒÂ©: ${specialty.name}`);
+                                addToHistory("Sélection spécialité", `Sélection de la spécialité: ${specialty.name}`);
                               }
                             }}
                             role="option"
@@ -2107,10 +2193,10 @@ const PatientDashboard = ({ currentUser, logout }) => {
                     if (validateStep(1)) {
                       setBookingStep(2);
                     } else {
-                      toast.error("Veuillez sÃƒÂ©lectionner une spÃƒÂ©cialitÃƒÂ©.");
+                      toast.error("Veuillez sélectionner une spécialité.");
                     }
                   }}
-                  aria-label="Passer ÃƒÂ  la sÃƒÂ©lection de date et heure"
+                  aria-label="Passer Ã  la sélection de date et heure"
                 >
                   Suivant
                 </Button>
@@ -2129,10 +2215,10 @@ const PatientDashboard = ({ currentUser, logout }) => {
                   setAvailableSlots([]);
                 }}
                 className="text-blue-600 hover:text-blue-700 transition-colors flex items-center"
-                aria-label="Retour aux spÃƒÂ©cialitÃƒÂ©s"
+                aria-label="Retour aux spécialités"
               >
                 <ArrowLeft className="w-5 h-5 mr-2" />
-                Retour aux spÃƒÂ©cialitÃƒÂ©s
+                Retour aux spécialités
               </button>
               <h4 className="font-semibold text-lg text-gray-700">
                 {selectedSpecialtyObj.name} - Choisissez une date et une heure
@@ -2151,17 +2237,17 @@ const PatientDashboard = ({ currentUser, logout }) => {
                     }}
                     minDate={new Date()}
                     dateFormat="dd/MM/yyyy"
-                    placeholderText="SÃƒÂ©lectionner une date"
+                    placeholderText="Sélectionner une date"
                     className="w-full rounded-xl px-4 py-3 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all cursor-pointer"
                     wrapperClassName="w-full"
                     locale="fr"
-                    aria-label="SÃƒÂ©lectionner une date"
+                    aria-label="Sélectionner une date"
                   />
                   {errors.date && <p className="text-red-600 text-sm">{errors.date}</p>}
                 </div>
                 {selectedDate && availableSlots.length > 0 && (
                   <div>
-                    <Label className="block text-sm font-medium text-gray-700 mb-2">CrÃƒÂ©neaux disponibles</Label>
+                    <Label className="block text-sm font-medium text-gray-700 mb-2">Créneaux disponibles</Label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                       {availableSlots.map((slot, index) => (
                         <Button
@@ -2171,7 +2257,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                             setSelectedTime(slot.time);
                           }}
                           className="rounded-xl px-4 py-3 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all duration-300"
-                          aria-label={`SÃƒÂ©lectionner l'heure ${slot.time}`}
+                          aria-label={`Sélectionner l'heure ${slot.time}`}
                         >
                           {slot.time}
                         </Button>
@@ -2181,7 +2267,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                   </div>
                 )}
                 {selectedDate && availableSlots.length === 0 && (
-                  <p className="text-red-600 text-sm">Aucun crÃƒÂ©neau disponible pour cette date.</p>
+                  <p className="text-red-600 text-sm">Aucun créneau disponible pour cette date.</p>
                 )}
               </div>
               <div className="mt-8 flex justify-end gap-4">
@@ -2202,11 +2288,11 @@ const PatientDashboard = ({ currentUser, logout }) => {
                     if (validateStep(2)) {
                       setBookingStep(3);
                     } else {
-                      toast.error("Veuillez sÃƒÂ©lectionner une date et une heure.");
+                      toast.error("Veuillez sélectionner une date et une heure.");
                     }
                   }}
                   disabled={!selectedDate || !selectedTime}
-                  aria-label="Passer ÃƒÂ  la confirmation"
+                  aria-label="Passer Ã  la confirmation"
                 >
                   Suivant
                 </Button>
@@ -2222,7 +2308,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
                   setErrors({});
                 }}
                 className="text-blue-600 hover:text-blue-700 transition-colors flex items-center"
-                aria-label="Retour ÃƒÂ  la sÃƒÂ©lection de date et heure"
+                aria-label="Retour Ã  la sélection de date et heure"
               >
                 <ArrowLeft className="w-5 h-5 mr-2" />
                 Retour
@@ -2232,7 +2318,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
               </h4>
               <div className="space-y-4">
                 <div>
-                  <Label className="block text-sm font-medium text-gray-700 mb-2">SpÃƒÂ©cialitÃƒÂ©</Label>
+                  <Label className="block text-sm font-medium text-gray-700 mb-2">Spécialité</Label>
                   <p className="text-sm text-gray-500">{selectedSpecialtyObj.name}</p>
                 </div>
                 <div>
@@ -2301,9 +2387,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
           {secondaryView === "accueil" && renderAccueilPage()}
           {secondaryView === "mesRdv" && renderMesRdvPage()}
           {secondaryView === "mesDocuments" && renderMesDocumentsPage()}
-          {secondaryView === "teleconsultation" && renderTeleconsultationPage()}
           {secondaryView === "statsPatient" && renderStatsPatientPage()}
-          {secondaryView === "activites" && renderPatientActivitiesPage()}
           {secondaryView === "messagerie" && renderMessageriePage()}
           {secondaryView === "profil" && renderProfilPage()}
           {secondaryView === "prendreRdv" && renderAccueilPage()}

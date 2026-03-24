@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { ArrowLeft, CalendarCheck, Search, Filter, RefreshCw, UserCheck, Users } from "lucide-react";
 
-const FiltresRdv = ({ filters, onFiltersChange }) => {
+const FiltresRdv = ({ filters, onFiltersChange, resultsCount, activeFilterCount }) => {
   const handleFilterChange = (key, value) => {
     onFiltersChange({
       ...filters,
@@ -39,14 +39,17 @@ const FiltresRdv = ({ filters, onFiltersChange }) => {
 
   return (
     <Card className="bg-card border border-border shadow-md rounded-2xl">
-      <CardContent className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold text-foreground">Filtres</h3>
+      {/* <CardContent className="p-6">
+        <div className="flex flex-col gap-2 mb-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-2">
+            <Filter className="h-5 w-5 text-primary" />
+            <h3 className="text-lg font-semibold text-foreground">Filtres rendez-vous</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">Recherche rapide par patient, médecin, spécialité ou période.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+          <div className="xl:col-span-2">
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
               Recherche par nom
             </label>
@@ -75,10 +78,10 @@ const FiltresRdv = ({ filters, onFiltersChange }) => {
 
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              MÃ©decin
+              Médecin
             </label>
             <Input
-              placeholder="Nom du mÃ©decin..."
+              placeholder="Nom du médecin..."
               value={filters.medecin || ""}
               onChange={(e) => handleFilterChange("medecin", e.target.value)}
               className="border-border focus:ring-2 focus:ring-primary/20"
@@ -87,10 +90,10 @@ const FiltresRdv = ({ filters, onFiltersChange }) => {
 
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              SpÃ©cialitÃ©
+              Spécialité
             </label>
             <Input
-              placeholder="SpÃ©cialitÃ© mÃ©dicale..."
+              placeholder="Spécialité médicale..."
               value={filters.specialite || ""}
               onChange={(e) => handleFilterChange("specialite", e.target.value)}
               className="border-border focus:ring-2 focus:ring-primary/20"
@@ -99,7 +102,7 @@ const FiltresRdv = ({ filters, onFiltersChange }) => {
 
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              PÃ©riode
+              Période
             </label>
             <Select
               value={filters.dateRange}
@@ -110,8 +113,8 @@ const FiltresRdv = ({ filters, onFiltersChange }) => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous les rendez-vous</SelectItem>
-                <SelectItem value="upcoming">Ã€ venir</SelectItem>
-                <SelectItem value="past">PassÃ©s</SelectItem>
+                <SelectItem value="upcoming">À venir</SelectItem>
+                <SelectItem value="past">Passés</SelectItem>
                 <SelectItem value="today">Aujourd'hui</SelectItem>
                 <SelectItem value="week">Cette semaine</SelectItem>
                 <SelectItem value="month">Ce mois</SelectItem>
@@ -120,17 +123,20 @@ const FiltresRdv = ({ filters, onFiltersChange }) => {
           </div>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
+            {resultsCount} rendez-vous affiché{resultsCount > 1 ? "s" : ""} {activeFilterCount > 0 ? `• ${activeFilterCount} filtre${activeFilterCount > 1 ? "s" : ""} actif${activeFilterCount > 1 ? "s" : ""}` : "• aucun filtre actif"}
+          </div>
           <Button
             variant="outline"
             onClick={resetFilters}
-            className="w-full border-border hover:bg-primary hover:text-primary-foreground transition-colors"
+            className="w-full md:w-auto border-border hover:bg-primary hover:text-primary-foreground transition-colors"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
-            RÃ©initialiser
+            Réinitialiser
           </Button>
         </div>
-      </CardContent>
+      </CardContent> */}
     </Card>
   );
 };
@@ -148,7 +154,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
     dateRange: "all",
   });
 
-  // Ã‰tats pour la gestion de l'assignation
+  // États pour la gestion de l'assignation
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedRdv, setSelectedRdv] = useState(null);
   const [availableDoctors, setAvailableDoctors] = useState([]);
@@ -255,6 +261,24 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
     });
   }, [rendezVous, filters]);
 
+  const appointmentStats = useMemo(() => {
+    const today = new Date().toLocaleDateString("en-CA");
+
+    return {
+      total: filteredRdv.length,
+      assigned: filteredRdv.filter((rdv) => Boolean(rdv.medecin)).length,
+      unassigned: filteredRdv.filter((rdv) => !rdv.medecin).length,
+      today: filteredRdv.filter((rdv) => String(rdv.date || "").slice(0, 10) === today).length,
+    };
+  }, [filteredRdv]);
+
+  const activeFilterCount = useMemo(
+    () =>
+      [filters.patient, filters.email, filters.medecin, filters.specialite].filter((value) => String(value || "").trim() !== "").length +
+      (filters.dateRange && filters.dateRange !== "all" ? 1 : 0),
+    [filters]
+  );
+
   // Fonction pour ouvrir le modal d'assignation
   const handleAssignDoctor = (rdv) => {
     setSelectedRdv(rdv);
@@ -263,7 +287,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
     loadAvailableDoctors(rdv.specialite, rdv.date);
   };
 
-  // Fonction pour charger les mÃ©decins disponibles selon la spÃ©cialitÃ©
+  // Fonction pour charger les médecins disponibles selon la spécialité
   const loadAvailableDoctors = async (specialite, date) => {
     try {
       const params = new URLSearchParams();
@@ -274,16 +298,16 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || 'Erreur lors du chargement des mÃ©decins');
+        throw new Error(err.error || 'Erreur lors du chargement des médecins');
       }
       const doctors = await response.json();
       setAvailableDoctors(doctors);
     } catch (error) {
-      console.error("Erreur lors du chargement des mÃ©decins:", error);
+      console.error("Erreur lors du chargement des médecins:", error);
     }
   };
 
-  // Fonction pour assigner un mÃ©decin Ã  un rendez-vous
+  // Fonction pour assigner un médecin à un rendez-vous
   const handleAssignAppointment = async () => {
     if (!selectedRdv || !selectedDoctor) return;
 
@@ -299,14 +323,14 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || "Ã‰chec de l'assignation");
+        throw new Error(err.error || "Échec de l'assignation");
       }
       const { appointment } = await response.json();
 
       const doctor = availableDoctors.find(doc => doc.id === parseInt(selectedDoctor));
       const updatedRdv = {
         ...selectedRdv,
-        medecin: doctor?.username || appointment?.medecin?.username || 'MÃ©decin',
+        medecin: doctor?.username || appointment?.medecin?.username || 'Médecin',
         medecinId: doctor?.id || appointment?.medecin_id,
       };
       if (setRendezVous) {
@@ -315,8 +339,8 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
 
       if (addToHistory) {
         await addToHistory(
-          'Assignation mÃ©decin',
-          `Assignation du Dr. ${doctor?.username || ''} au rendez-vous du ${String(selectedRdv.date).slice(0,10)} Ã  ${selectedRdv.heure || selectedRdv.time}`
+          'Assignation médecin',
+          `Assignation du Dr. ${doctor?.username || ''} au rendez-vous du ${String(selectedRdv.date).slice(0,10)} à ${selectedRdv.heure || selectedRdv.time}`
         );
       }
 
@@ -325,7 +349,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
       setSelectedDoctor('');
     } catch (error) {
       console.error("Erreur lors de l'assignation:", error);
-      alert(error.message || "Erreur lors de l'assignation du mÃ©decin. Veuillez rÃ©essayer.");
+      alert(error.message || "Erreur lors de l'assignation du médecin. Veuillez réessayer.");
     } finally {
       setIsAssigning(false);
     }
@@ -335,7 +359,28 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
     <main className="min-h-screen container mx-auto px-6 py-10 space-y-10 bg-background text-foreground">
       {/* Filtres */}
       <section>
-        <FiltresRdv filters={filters} onFiltersChange={setFilters} />
+        <FiltresRdv
+          filters={filters}
+          onFiltersChange={setFilters}
+          resultsCount={filteredRdv.length}
+          activeFilterCount={activeFilterCount}
+        />
+      </section>
+
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {[
+          { label: "Total affiché", value: appointmentStats.total, tone: "text-slate-700 bg-slate-100" },
+          { label: "Assignés", value: appointmentStats.assigned, tone: "text-emerald-700 bg-emerald-100" },
+          { label: "Non assignés", value: appointmentStats.unassigned, tone: "text-amber-700 bg-amber-100" },
+          { label: "Aujourd'hui", value: appointmentStats.today, tone: "text-cyan-700 bg-cyan-100" },
+        ].map((item) => (
+          <Card key={item.label} className="border border-border shadow-sm rounded-2xl">
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">{item.label}</p>
+              <p className={`mt-3 inline-flex rounded-full px-3 py-1 text-2xl font-bold ${item.tone}`}>{item.value}</p>
+            </CardContent>
+          </Card>
+        ))}
       </section>
 
       {/* Tableau des rendez-vous */}
@@ -346,11 +391,11 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
               <tr>
                 <th className="p-3 text-left font-semibold border-b">ID</th>
                 <th className="p-3 text-left font-semibold border-b">Nom</th>
-                <th className="p-3 text-left font-semibold border-b">PrÃ©nom</th>
+                <th className="p-3 text-left font-semibold border-b">Prénom</th>
                 <th className="p-3 text-left font-semibold border-b">Email</th>
-                <th className="p-3 text-left font-semibold border-b">TÃ©lÃ©phone</th>
-                <th className="p-3 text-left font-semibold border-b">SpÃ©cialitÃ©</th>
-                <th className="p-3 text-left font-semibold border-b">MÃ©decin</th>
+                <th className="p-3 text-left font-semibold border-b">Téléphone</th>
+                <th className="p-3 text-left font-semibold border-b">Spécialité</th>
+                <th className="p-3 text-left font-semibold border-b">Médecin</th>
                 <th className="p-3 text-left font-semibold border-b">Date</th>
                 <th className="p-3 text-left font-semibold border-b">Heure</th>
                 <th className="p-3 text-left font-semibold border-b">Statut</th>
@@ -380,9 +425,9 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                       <span className={rdv.medecin ? "text-green-600 font-medium" : "text-gray-500"}>
                         {rdv.medecin
                           ? (typeof rdv.medecin === 'object' && rdv.medecin !== null
-                            ? rdv.medecin.username || `${rdv.medecin.prenom || ''} ${rdv.medecin.nom || ''}`.trim() || "MÃ©decin inconnu"
+                            ? rdv.medecin.username || `${rdv.medecin.prenom || ''} ${rdv.medecin.nom || ''}`.trim() || "Médecin inconnu"
                             : rdv.medecin)
-                          : "Non assignÃ©"}
+                          : "Non assigné"}
                       </span>
                     </td>
                     <td className="p-3">
@@ -418,7 +463,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                         disabled={!!rdv.medecin}
                       >
                         <UserCheck className="w-4 h-4 mr-1" />
-                        {rdv.medecin ? "AssignÃ©" : "Assigner"}
+                        {rdv.medecin ? "Assigné" : "Assigner"}
                       </Button>
                     </td>
                   </tr>
@@ -427,8 +472,8 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                 <tr key="no-rdv-found">
                   <td colSpan={11} className="text-center py-8 text-muted-foreground">
                     {rendezVous.length === 0
-                      ? "Aucun rendez-vous enregistrÃ©"
-                      : "Aucun rendez-vous ne correspond aux critÃ¨res de filtrage"}
+                      ? "Aucun rendez-vous enregistré"
+                      : "Aucun rendez-vous ne correspond aux critères de filtrage"}
                   </td>
                 </tr>
               )}
@@ -437,18 +482,18 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
         </div>
       </section>
 
-      {/* Modal d'assignation de mÃ©decin */}
+      {/* Modal d'assignation de médecin */}
       <Dialog open={showAssignModal} onOpenChange={setShowAssignModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserCheck className="w-5 h-5 text-blue-600" />
-              Assigner un mÃ©decin
+              Assigner un médecin
             </DialogTitle>
             <DialogDescription>
               {selectedRdv && (
                 <>
-                  Assigner un mÃ©decin au rendez-vous de{" "}
+                  Assigner un médecin au rendez-vous de{" "}
                   <strong>
                     {selectedRdv.username
                       ? String(selectedRdv.username)
@@ -462,9 +507,9 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                       : "Date inconnue"
                     }
                   </strong>{" "}
-                  Ã  <strong>{String(selectedRdv.heure || selectedRdv.time || "Heure inconnue")}</strong>
+                  à <strong>{String(selectedRdv.heure || selectedRdv.time || "Heure inconnue")}</strong>
                   {selectedRdv.specialite && (
-                    <> pour la spÃ©cialitÃ© <strong>{String(selectedRdv.specialite)}</strong></>
+                    <> pour la spécialité <strong>{String(selectedRdv.specialite)}</strong></>
                   )}
                 </>
               )}
@@ -474,11 +519,11 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                SÃ©lectionner un mÃ©decin
+                Sélectionner un médecin
               </label>
               <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
                 <SelectTrigger className="border-border focus:ring-2 focus:ring-primary/20">
-                  <SelectValue placeholder="Choisir un mÃ©decin..." />
+                  <SelectValue placeholder="Choisir un médecin..." />
                 </SelectTrigger>
                 <SelectContent>
                   {availableDoctors.length > 0 ? (
@@ -489,7 +534,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
                     ))
                   ) : (
                     <SelectItem value="" disabled>
-                      Aucun mÃ©decin disponible pour cette spÃ©cialitÃ©
+                      Aucun médecin disponible pour cette spécialité
                     </SelectItem>
                   )}
                 </SelectContent>
@@ -499,7 +544,7 @@ const API_BASE_URL = _apiBase.endsWith("/api") ? _apiBase : `${_apiBase}/api`;
             {availableDoctors.length > 0 && selectedDoctor && (
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <p className="text-sm text-blue-800">
-                  <strong>MÃ©decin sÃ©lectionnÃ© :</strong>{" "}
+                  <strong>Médecin sélectionné :</strong>{" "}
                   Dr. {availableDoctors.find(doc => doc.id === parseInt(selectedDoctor))?.username}
                 </p>
               </div>
