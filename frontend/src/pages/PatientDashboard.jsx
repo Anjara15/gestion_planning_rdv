@@ -768,8 +768,8 @@ const PatientDashboard = ({ currentUser, logout }) => {
     () => [
       { name: "RDV", value: patientStats.totalRdv, fill: "#06b6d4" },
       { name: "Documents", value: patientStats.documentsCount, fill: "#f59e0b" },
-      { name: "Sports", value: patientStats.activitiesCount, fill: "#ec4899" },
-      { name: "Paiements", value: patientStats.paymentsCount, fill: "#10b981" },
+      // { name: "Sports", value: patientStats.activitiesCount, fill: "#ec4899" },
+      // { name: "Paiements", value: patientStats.paymentsCount, fill: "#10b981" },
     ],
     [patientStats]
   );
@@ -1305,14 +1305,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
         icon: FolderOpen,
         className: "from-cyan-500 to-sky-600",
       },
-      {
-        key: "paiements",
-        title: "Paiements",
-        subtitle: "Factures et statuts",
-        count: patientPayments.length,
-        icon: Wallet,
-        className: "from-emerald-500 to-teal-600",
-      },
+     
     ];
 
     const selected = documentCards.find((card) => card.key === activeDocumentCard) || documentCards[0];
@@ -1480,124 +1473,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
               </div>
             )}
 
-            {activeDocumentCard === "paiements" && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
-                  <Input
-                    type="number"
-                    min="0"
-                    placeholder="Montant"
-                    value={paymentForm.amount}
-                    onChange={(e) => setPaymentForm((prev) => ({ ...prev, amount: e.target.value }))}
-                  />
-                  <Input
-                    placeholder="Description"
-                    value={paymentForm.description}
-                    onChange={(e) => setPaymentForm((prev) => ({ ...prev, description: e.target.value }))}
-                  />
-                  <select
-                    value={paymentForm.status}
-                    onChange={(e) => setPaymentForm((prev) => ({ ...prev, status: e.target.value }))}
-                    className="rounded-xl border border-gray-200 px-3 py-2"
-                  >
-                    <option value="en_attente">En attente</option>
-                    <option value="paye">Payé</option>
-                    <option value="annule">Annulé</option>
-                  </select>
-                  <Button
-                    onClick={async () => {
-                      if (!String(paymentForm.amount).trim()) return;
-                      try {
-                        const payload = {
-                          amount: Number(paymentForm.amount),
-                          description: paymentForm.description,
-                          status: paymentForm.status,
-                        };
-                        if (editingPaymentId) {
-                          await updatePayment(editingPaymentId, payload);
-                          toast.success("Paiement mis à jour");
-                        } else {
-                          await addPayment(payload);
-                          toast.success("Paiement ajouté");
-                        }
-                        setPaymentForm({ amount: "", description: "", status: "en_attente" });
-                        setEditingPaymentId(null);
-                      } catch (error) {
-                        console.error(error);
-                        toast.error("Erreur sauvegarde paiement");
-                      }
-                    }}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    {editingPaymentId ? "Modifier" : "Ajouter"}
-                  </Button>
-                </div>
-                {patientPayments.length === 0 ? (
-                  <p className="text-sm text-gray-500">Aucun paiement enregistre pour le moment.</p>
-                ) : (
-                  patientPayments.map((payment) => {
-                    const status = payment.status || "en_attente";
-                    const statusClass =
-                      status === "paye"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : status === "annule"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-amber-100 text-amber-700";
-                    const statusLabel = status === "paye" ? "Paye" : status === "annule" ? "Annule" : "En attente";
-                    return (
-                      <div key={payment.id || payment.reference} className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                          <p className="font-medium text-gray-700">{Number(payment.amount || 0).toLocaleString("fr-FR")} Ar</p>
-                          <Badge className={statusClass}>{statusLabel}</Badge>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">{payment.description || "Aucune description"}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {payment.date ? new Date(payment.date).toLocaleDateString("fr-FR") : "Date non définie"}
-                        </p>
-                        <div className="mt-3 flex gap-2">
-                          <Button
-                            variant="outline"
-                            className="rounded-xl"
-                            onClick={() => {
-                              setEditingPaymentId(payment.id);
-                              setPaymentForm({
-                                amount: String(payment.amount || ""),
-                                description: payment.description || "",
-                                status: payment.status || "en_attente",
-                              });
-                            }}
-                          >
-                            Modifier
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="rounded-xl border-red-200 text-red-700 hover:bg-red-50"
-                            onClick={async () => {
-                              if (!window.confirm("Supprimer ce paiement ?")) return;
-                              try {
-                                await deletePayment(payment.id);
-                                if (editingPaymentId === payment.id) {
-                                  setEditingPaymentId(null);
-                                  setPaymentForm({ amount: "", description: "", status: "en_attente" });
-                                }
-                                toast.success("Paiement supprimé");
-                              } catch (error) {
-                                console.error(error);
-                                toast.error("Erreur suppression paiement");
-                              }
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Supprimer
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
+            
           </div>
         </div>
       </div>
@@ -1735,7 +1611,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="rounded-xl border border-gray-200 p-4">
             <h4 className="font-semibold text-gray-700 mb-3">Diagramme paiements (Ar)</h4>
             <div className="h-64">
@@ -1756,10 +1632,10 @@ const PatientDashboard = ({ currentUser, logout }) => {
               <p className="flex items-center justify-between"><span>Total RDV</span><span className="font-medium">{patientStats.totalRdv}</span></p>
               <p className="flex items-center justify-between"><span>Documents</span><span className="font-medium">{patientStats.documentsCount}</span></p>
               <p className="flex items-center justify-between"><span>Activites sportives</span><span className="font-medium">{patientStats.activitiesCount}</span></p>
-              <p className="flex items-center justify-between"><span>Paiements enregistres</span><span className="font-medium">{patientStats.paymentsCount}</span></p>
+              {/* <p className="flex items-center justify-between"><span>Paiements enregistres</span><span className="font-medium">{patientStats.paymentsCount}</span></p> 
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );
@@ -1776,7 +1652,7 @@ const PatientDashboard = ({ currentUser, logout }) => {
           className="rounded-xl border-gray-200 text-gray-700 hover:bg-gray-100"
           onClick={() => setSportsVersion((prev) => prev + 1)}
         >
-          <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw className="w-4 h-4 mr-2" />
           Actualiser
         </Button>
       </div>

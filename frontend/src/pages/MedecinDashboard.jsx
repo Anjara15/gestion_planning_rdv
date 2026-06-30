@@ -1391,7 +1391,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
                   </LineChart>
                 </div>
               </div>
-              <div className="w-full">
+              {/* <div className="w-full">
                 <h4 className="text-base font-medium text-gray-700 mb-4 text-center">Repartition des rendez-vous par specialite</h4>
                 <div className="w-full h-64 flex justify-center">
                   <PieChart width={Math.min(window.innerWidth * 0.9, 400)} height={250}>
@@ -1412,7 +1412,7 @@ const MedecinDashboard = ({ currentUser, addToHistory, logout }) => {
                     <Tooltip />
                   </PieChart>
                 </div>
-              </div>
+              </div> */}
             </div>
           ) : (
             <div className="text-center py-8">
